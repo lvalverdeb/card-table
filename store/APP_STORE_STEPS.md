@@ -14,6 +14,7 @@ Apple's process has fewer forms than Google's but needs a paid membership and a 
 | · iPhone with Face ID (large display), 1284 × 2778, three shots | `iphone-face-id-large-*.png` |
 | · iPhone Duo inner display, 2007 × 2853, and outer display, 1398 × 2034, three shots each (optional until April 2027) | `iphone-duo-inner-*.png`, `iphone-duo-outer-*.png` |
 | · iPad 13" display, 2064 × 2752, **required**, three shots | `ipad-13-*.png` |
+| Mac App Store screenshots, 2880 × 1800 landscape, seven per language, from `node store-screenshots.js --mac`; only needed if a macOS version is ever submitted (the iOS build is not a Mac app; tick "Make this app available on Mac" under Pricing and Availability instead) | `store/apple/mac/screenshots/{en,es,fr}/mac-*.png` |
 | iPad 13-inch screenshots, 2064 × 2752, three per language | `store/apple/screenshots/{en,es,fr}/ipad-13-*.png` |
 | Listing text in English, Spanish and French (same copy as Google Play; Apple's limits are 30 characters for the name, 30 for the subtitle, 170 for the promotional text, 4000 for the description) | `store/listing-en.md`, `listing-es.md`, `listing-fr.md` |
 | Privacy policy URL | https://lvalverdeb.github.io/card-table/store/privacy-policy.html |

@@ -1,19 +1,23 @@
 // Renders Google Play store assets from the live page: phone and tablet screenshots in three languages,
 // plus the 1024x500 feature graphic. Usage: cd test && node store-screenshots.js   (output in store/)
-// With --apple it renders App Store sizes instead (iPhone 6.9-inch and iPad 13-inch) into store/apple/.
+// With --apple it renders App Store sizes instead, one set per App Store Connect slot, into store/apple/.
+// With --mac it renders Mac App Store sizes (2880x1800 landscape) into store/apple/mac/.
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
-const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'store', process.argv.includes('--apple') ? 'apple' : '');
+const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'store', process.argv.includes('--mac') ? 'apple/mac' : process.argv.includes('--apple') ? 'apple' : '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const serve = () => new Promise(res => {
   const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split('?')[0]); fs.readFile(path.join(ROOT, u === '/' ? 'index.html' : u), (e, d) => { if (e) { r.writeHead(404); r.end(); } else r.end(d); }); });
   srv.listen(0, () => res({ srv, url: 'http://127.0.0.1:' + srv.address().port + '/' }));
 });
-const APPLE = process.argv.includes('--apple');
+const MAC = process.argv.includes('--mac');       /* Mac App Store: 16:10 landscape, 2880x1800 (also accepts 1280x800, 1440x900, 2560x1600) */
+const APPLE = process.argv.includes('--apple') || MAC;
 /* App Store sizes, one set per App Store Connect slot, named as the console labels them. Required: "iPhone with Dynamic
    Island (medium display)" and "iPad 13-inch display". Each slot accepts only its own pixel sizes, so a file dropped in the
    wrong slot fails with "File dimensions are invalid"; the file name prefix says which slot it belongs to. */
-const SIZES = APPLE
+const SIZES = MAC
+  ? { 'mac': { w: 1440, h: 900, scale: 2 } }
+  : APPLE
   ? { 'iphone-dynamic-island-medium': { w: 402, h: 874, scale: 3 },    /* 1206x2622, required */
       'iphone-dynamic-island-large': { w: 440, h: 956, scale: 3 },     /* 1320x2868 */
       'iphone-face-id-large': { w: 428, h: 926, scale: 3 },            /* 1284x2778 */
@@ -21,7 +25,7 @@ const SIZES = APPLE
       'iphone-duo-outer': { w: 699, h: 1017, scale: 2 },               /* 1398x2034 */
       'ipad-13': { w: 1032, h: 1376, scale: 2 } }                      /* 2064x2752, required */
   : { phone: { w: 360, h: 640, scale: 3 }, tablet7: { w: 600, h: 960, scale: 2 }, tablet10: { w: 800, h: 1280, scale: 2 } };
-const FULL = ['phone', 'iphone-dynamic-island-medium', 'iphone-dynamic-island-large'];   /* all seven shots; other slots get three */
+const FULL = ['phone', 'iphone-dynamic-island-medium', 'iphone-dynamic-island-large', 'mac'];   /* all seven shots; other slots get three */
 const GAMES = ['menu', 'klondike', 'freecell', 'rummy', 'hearts', 'eights', 'sevens'];
 (async () => {
   const { srv, url } = await serve();
