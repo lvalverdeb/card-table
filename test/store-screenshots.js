@@ -1,21 +1,25 @@
 // Renders Google Play store assets from the live page: phone and tablet screenshots in three languages,
 // plus the 1024x500 feature graphic. Usage: cd test && node store-screenshots.js   (output in store/)
+// With --apple it renders App Store sizes instead (iPhone 6.9-inch and iPad 13-inch) into store/apple/.
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
-const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'store');
+const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, 'store', process.argv.includes('--apple') ? 'apple' : '');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const serve = () => new Promise(res => {
   const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split('?')[0]); fs.readFile(path.join(ROOT, u === '/' ? 'index.html' : u), (e, d) => { if (e) { r.writeHead(404); r.end(); } else r.end(d); }); });
   srv.listen(0, () => res({ srv, url: 'http://127.0.0.1:' + srv.address().port + '/' }));
 });
-const SIZES = { phone: { w: 360, h: 640, scale: 3 }, tablet7: { w: 600, h: 960, scale: 2 }, tablet10: { w: 800, h: 1280, scale: 2 } };
+const APPLE = process.argv.includes('--apple');   /* App Store sizes: iPhone 6.9-inch 1320x2868, iPad 13-inch 2064x2752 */
+const SIZES = APPLE
+  ? { 'iphone-6.9': { w: 440, h: 956, scale: 3 }, 'ipad-13': { w: 1032, h: 1376, scale: 2 } }
+  : { phone: { w: 360, h: 640, scale: 3 }, tablet7: { w: 600, h: 960, scale: 2 }, tablet10: { w: 800, h: 1280, scale: 2 } };
 const GAMES = ['menu', 'klondike', 'freecell', 'rummy', 'hearts', 'eights', 'sevens'];
 (async () => {
   const { srv, url } = await serve();
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   for (const lang of ['en', 'es', 'fr']) {
     for (const [name, sz] of Object.entries(SIZES)) {
-      const games = name === 'phone' ? GAMES : ['menu', 'klondike', 'hearts'];
+      const games = name === 'phone' || name === 'iphone-6.9' ? GAMES : ['menu', 'klondike', 'hearts'];
       const ctx = await browser.newContext({ viewport: { width: sz.w, height: sz.h }, deviceScaleFactor: sz.scale, locale: lang });
       const p = await ctx.newPage();
       await p.goto(url + '#menu'); await sleep(300);
@@ -33,6 +37,7 @@ const GAMES = ['menu', 'klondike', 'freecell', 'rummy', 'hearts', 'eights', 'sev
       await ctx.close();
     }
   }
+  if (APPLE) { await browser.close(); srv.close(); console.log('App Store screenshots written to', OUT); return; }
   /* feature graphic: the app's own menu styling, composed for 1024x500 */
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 500 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();

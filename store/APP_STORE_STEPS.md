@@ -1,0 +1,71 @@
+# Publishing Card Table to the App Store
+
+Apple's process has fewer forms than Google's but needs a paid membership and a Mac with Xcode. Budget a day or two for enrolment and one to three days for the first review.
+
+## What is ready
+
+| Item | Where |
+|---|---|
+| iOS project, bundle id `com.lvalverdeb.cardtable`, version 1.0 build 1, iOS 14 and later, iPhone and iPad | `ios/App/App.xcodeproj` |
+| App icon (1024 × 1024, in the asset catalog) and splash | `ios/App/App/Assets.xcassets` |
+| iPhone 6.9-inch screenshots, 1320 × 2868, seven per language | `store/apple/screenshots/{en,es,fr}/iphone-6.9-*.png` |
+| iPad 13-inch screenshots, 2064 × 2752, three per language | `store/apple/screenshots/{en,es,fr}/ipad-13-*.png` |
+| Listing text in English, Spanish and French (same copy as Google Play; Apple's limits are 30 characters for the name, 30 for the subtitle, 170 for the promotional text, 4000 for the description) | `store/listing-en.md`, `listing-es.md`, `listing-fr.md` |
+| Privacy policy URL | https://lvalverdeb.github.io/card-table/store/privacy-policy.html |
+| Support URL | https://github.com/lvalverdeb/card-table |
+| Export compliance | `ITSAppUsesNonExemptEncryption` is `false` in `Info.plist`, so App Store Connect does not ask about encryption for each build |
+
+Regenerate the screenshots after any visual change with `cd test && node store-screenshots.js --apple`.
+
+## 1. Join the Apple Developer Program
+
+1. Go to https://developer.apple.com/programs/enroll/ and sign in with the Apple ID you use in Xcode.
+2. Enrol as an **Individual**. The fee is 99 USD per year. Apple verifies your identity, sometimes with a phone call or an ID upload; the confirmation email can take up to two days.
+3. In Xcode, open Settings > Accounts and confirm the Apple ID now shows a team that is **not** marked "Personal Team". Only a paid team can upload to App Store Connect.
+
+## 2. Create the app record
+
+1. Go to https://appstoreconnect.apple.com, open **Apps**, and click **+** > **New App**.
+2. Platform iOS. Name `Card Table: Six Games`. Primary language English (U.S.). Bundle ID: choose `com.lvalverdeb.cardtable` (register it first at https://developer.apple.com/account/resources/identifiers if it is not in the list; no capabilities are needed). SKU: `cardtable`. User access: Full access.
+
+## 3. Upload the build
+
+From the project folder:
+
+```
+npm run sync
+cd ios/App
+xcodebuild -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/CardTable.xcarchive -allowProvisioningUpdates archive
+xcodebuild -exportArchive -archivePath build/CardTable.xcarchive -exportOptionsPlist ../../store/apple/export-appstore.plist -exportPath build/export -allowProvisioningUpdates
+```
+
+The export both signs with your distribution certificate (Xcode creates it on first use) and uploads to App Store Connect. The build appears under the app's **TestFlight** tab ten to thirty minutes later, after Apple's processing.
+
+The same can be done in Xcode: Product > Archive, then **Distribute App** > **App Store Connect** > Upload.
+
+## 4. Fill in the App Store listing
+
+Open the app in App Store Connect and work down the **1.0 Prepare for Submission** page:
+
+- **Screenshots**: drag the iPhone 6.9-inch set and the iPad 13-inch set from `store/apple/screenshots/en`. Apple scales these for smaller devices.
+- **Promotional text** (optional, 170 characters): "Six classic card games, fully offline, with no ads and no accounts."
+- **Description**: the full description from `listing-en.md`. **Keywords** (100 characters): `solitaire,klondike,freecell,rummy,hearts,crazy eights,sevens,card games,offline`.
+- **Support URL**: the GitHub repository. **Marketing URL** (optional): https://lvalverdeb.github.io/card-table/
+- **Build**: select the uploaded build.
+- **App Review information**: your name, phone and email; no sign-in required; notes can say "Fully offline card games; nothing to configure."
+- **Version release**: automatically release after approval, or manual.
+- **Localisations**: use the language menu at the top right of the page to add Spanish (Mexico) and French, paste from `listing-es.md` and `listing-fr.md`, and drag the matching screenshot folders.
+
+Then the app-level sections in the left column:
+
+- **App Information**: subtitle `Six classic card games` (30 characters max), category Games, secondary category Card. Content rights: does not contain third-party content. Age rating: answer None to everything; Vegas scoring is simulated with nothing to buy, which Apple's "Simulated gambling" question does not count unless real currency or purchases are involved. Expect 4+.
+- **Pricing and Availability**: Free, all countries.
+- **App Privacy**: privacy policy URL as above; click **Get started** and choose **Data Not Collected**. Confirm. The listing then shows the "Data Not Collected" label.
+
+## 5. Submit
+
+Click **Add for Review**, then **Submit to App Review**. Apple normally answers within one to three days. If rejected, the reasons appear in **App Review** messages; most first-submission issues are missing metadata, which can be fixed and resubmitted without a new build.
+
+## Updating later
+
+Raise `MARKETING_VERSION` (the version people see) and `CURRENT_PROJECT_VERSION` (the build number, which must increase for every upload) in Xcode under the App target's General tab, or in `ios/App/App.xcodeproj/project.pbxproj`. Then repeat step 3 and create a new version in App Store Connect.
