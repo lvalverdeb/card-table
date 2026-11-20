@@ -9,9 +9,11 @@ const serve = () => new Promise(res => {
   const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split('?')[0]); fs.readFile(path.join(ROOT, u === '/' ? 'index.html' : u), (e, d) => { if (e) { r.writeHead(404); r.end(); } else r.end(d); }); });
   srv.listen(0, () => res({ srv, url: 'http://127.0.0.1:' + srv.address().port + '/' }));
 });
-const APPLE = process.argv.includes('--apple');   /* App Store sizes: iPhone 6.9-inch 1320x2868, iPad 13-inch 2064x2752 */
+const APPLE = process.argv.includes('--apple');
+/* App Store sizes. App Store Connect requires the "iPhone with Dynamic Island (medium display)" set, 1206x2622,
+   and the iPad 13-inch set, 2064x2752; the large-display set, 1320x2868, is optional and scaled from medium if absent. */
 const SIZES = APPLE
-  ? { 'iphone-6.9': { w: 440, h: 956, scale: 3 }, 'ipad-13': { w: 1032, h: 1376, scale: 2 } }
+  ? { 'iphone-medium': { w: 402, h: 874, scale: 3 }, 'iphone-large': { w: 440, h: 956, scale: 3 }, 'ipad-13': { w: 1032, h: 1376, scale: 2 } }
   : { phone: { w: 360, h: 640, scale: 3 }, tablet7: { w: 600, h: 960, scale: 2 }, tablet10: { w: 800, h: 1280, scale: 2 } };
 const GAMES = ['menu', 'klondike', 'freecell', 'rummy', 'hearts', 'eights', 'sevens'];
 (async () => {
@@ -19,7 +21,7 @@ const GAMES = ['menu', 'klondike', 'freecell', 'rummy', 'hearts', 'eights', 'sev
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   for (const lang of ['en', 'es', 'fr']) {
     for (const [name, sz] of Object.entries(SIZES)) {
-      const games = name === 'phone' || name === 'iphone-6.9' ? GAMES : ['menu', 'klondike', 'hearts'];
+      const games = name === 'phone' || name.startsWith('iphone') ? GAMES : ['menu', 'klondike', 'hearts'];
       const ctx = await browser.newContext({ viewport: { width: sz.w, height: sz.h }, deviceScaleFactor: sz.scale, locale: lang });
       const p = await ctx.newPage();
       await p.goto(url + '#menu'); await sleep(300);
