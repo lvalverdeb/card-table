@@ -1,0 +1,31 @@
+# dependencies and build output
+node_modules/
+dist/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+ios/App/build/
+ios/App/DerivedData/
+ios/App/Pods/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/config.xml
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/capacitor.build.gradle
+android/capacitor-cordova-android-plugins/
+
+# signing secrets: never commit these
+android/keystore.properties
+android/keystore/
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+
+# editors and OS
+.DS_Store
+.vscode/
+*.swp

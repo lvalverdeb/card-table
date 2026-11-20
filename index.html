@@ -1,0 +1,2452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Card Table: Six Games</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2712%27 fill=%27%231d4a3c%27/%3E%3Ctext x=%2732%27 y=%2748%27 font-size=%2744%27 text-anchor=%27middle%27 fill=%27%23f5efe0%27%3E%E2%99%A0%3C/text%3E%3C/svg%3E">
+<style>
+@font-face{font-family:"Instrument Sans";font-style:normal;font-weight:500 700;font-display:swap;src:url(fonts/InstrumentSans-latin.woff2) format("woff2")}
+@font-face{font-family:"Young Serif";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/YoungSerif-latin.woff2) format("woff2")}
+:root{
+  /* Layout: one screen. Stats along the top, the felt fills the middle,
+     controls sit at the bottom within thumb reach. Single theme: a spruce card table. */
+  --felt:#1d4a3c;
+  --felt-deep:#102c24;
+  --brass:#d4ad5a;
+  --ink:#1b1a17;
+  --pip-red:#b42a22;
+  --chalk:#e8e2cf;
+  --line:rgba(232,226,207,.16);
+  --display:"Young Serif",Georgia,"Times New Roman",serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+/* everything a card design may change, with the Classic values; a design is one rule overriding some of these */
+:root,[data-deck="classic"]{
+  --ivory:#f5efe0;--back:#7b2030;--back-border:var(--ivory);--back-size:auto;
+  --back-pattern:repeating-linear-gradient(45deg,rgba(255,255,255,.1) 0 2px,transparent 2px 7px),repeating-linear-gradient(-45deg,rgba(255,255,255,.1) 0 2px,transparent 2px 7px);
+  --idx-size:1em;--idx-top:.14em;--idx-side:.2em;--mid-size:2.1em;--mid-top:57%;--court-size:2.3em;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{
+  display:flex;flex-direction:column;overflow:hidden;touch-action:manipulation;
+  background:var(--felt-deep);color:var(--chalk);font-family:var(--body);
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+header{
+  display:flex;align-items:center;justify-content:space-between;gap:8px 20px;
+  padding:calc(10px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));
+  border-bottom:1px solid var(--line);
+}
+h1{
+  margin:0;font-family:var(--display);font-weight:400;color:var(--brass);
+  font-size:clamp(1.3rem,4.5vw,1.75rem);letter-spacing:.01em;line-height:1;
+}
+.stats{display:flex;gap:clamp(14px,4vw,28px);margin:0}
+.stats div{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.stats dt{font-size:.62rem;text-transform:uppercase;letter-spacing:.14em;opacity:.7}
+.stats dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600;font-size:1.05rem;line-height:1}
+
+#stage{
+  position:relative;flex:1;min-height:0;
+  background:radial-gradient(120% 90% at 50% 0%,#27624f 0%,var(--felt) 45%,var(--felt-deep) 100%);
+}
+#area{position:absolute;inset:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+  padding:14px max(16px,env(safe-area-inset-right)) 14px max(16px,env(safe-area-inset-left))}
+#area::-webkit-scrollbar{display:none}
+#board{position:relative;margin:0 auto}
+
+.slot{
+  position:absolute;left:0;top:0;width:var(--cw);height:var(--ch);
+  border:1.5px solid rgba(232,226,207,.2);border-radius:calc(var(--cw)*.08);
+  display:grid;place-items:center;color:rgba(232,226,207,.32);
+  font-family:var(--display);font-size:calc(var(--cw)*.42);
+}
+#slot-stock{cursor:pointer}
+#slot-stock.dead{cursor:default;border-style:dashed;border-color:rgba(232,226,207,.28);background:rgba(0,0,0,.18);color:rgba(232,226,207,.4);font-family:var(--body);font-weight:600;font-size:calc(var(--cw)*.5)}   /* Vegas: no passes left */
+
+.card{
+  position:absolute;left:0;top:0;width:var(--cw);height:var(--ch);
+  z-index:var(--z,0);font-size:calc(var(--cw)*.3);
+  transition:transform .2s cubic-bezier(.2,.8,.3,1);transition-delay:var(--d,0s);
+  touch-action:none;cursor:grab;will-change:transform;
+}
+.card.lift{z-index:calc(var(--z,0) + 1000)}
+.card.drag{z-index:calc(var(--z,0) + 2000);transition:none;cursor:grabbing}
+.inner{
+  position:absolute;inset:0;transform-style:preserve-3d;
+  transition:transform .28s ease;transition-delay:calc(var(--d,0s) + .1s);
+}
+.card.down .inner{transform:rotateY(180deg)}
+.still .card,.still .inner,.card.still,.card.still .inner{transition:none}
+.face,.back{
+  position:absolute;inset:0;border-radius:calc(var(--cw)*.08);
+  -webkit-backface-visibility:hidden;backface-visibility:hidden;
+  box-shadow:0 1px 2px rgba(0,0,0,.4);
+}
+.face{background:var(--ivory);color:var(--ink);border:1px solid #cdc4ab;overflow:hidden}
+.face.red{color:var(--pip-red)}
+.card.drag .face{box-shadow:0 12px 24px rgba(0,0,0,.45)}
+.back{
+  transform:rotateY(180deg);
+  border:calc(var(--cw)*.05) solid var(--back-border);
+  background:var(--back-pattern),var(--back);background-size:var(--back-size);
+}
+/* card designs: set data-deck on <html> for the whole page, or on any element for a local preview */
+[data-deck="midnight"]{--back:#1e3a63;--back-pattern:repeating-linear-gradient(135deg,rgba(255,255,255,.16) 0 1.5px,transparent 1.5px 6px)}
+[data-deck="meadow"]{--back:#2d6a46;--ivory:#f8f3e4;--back-pattern:radial-gradient(rgba(255,255,255,.28) 1.3px,transparent 1.8px);--back-size:9px 9px}
+[data-deck="cascade"]{--back:#1d4a3c;--back-pattern:repeating-linear-gradient(45deg,rgba(212,173,90,.38) 0 1.5px,transparent 1.5px 8px),repeating-linear-gradient(-45deg,rgba(212,173,90,.38) 0 1.5px,transparent 1.5px 8px),radial-gradient(120% 90% at 50% 0%,#27624f 0%,#1d4a3c 45%,#102c24 100%)}
+[data-deck="cascade"]{--back-border:var(--brass)}
+[data-deck="large"]{--back:#5a2340;--back-pattern:repeating-linear-gradient(90deg,rgba(255,255,255,.12) 0 3px,transparent 3px 9px);--idx-size:1.35em;--idx-top:.08em;--idx-side:.12em;--mid-size:1.5em;--mid-top:64%;--court-size:1.7em}
+.idx{position:absolute;top:var(--idx-top);left:var(--idx-side);font-size:var(--idx-size);display:flex;align-items:baseline;gap:.06em;line-height:1}
+.idx b{font-weight:700;letter-spacing:-.05em}
+.idx i{font-style:normal;font-size:.9em}
+.idx.flip{top:auto;left:auto;bottom:var(--idx-top);right:var(--idx-side);transform:rotate(180deg)}
+.small .idx.flip{display:none}
+.mid{position:absolute;left:0;right:0;top:var(--mid-top);transform:translateY(-50%);text-align:center;font-size:var(--mid-size);line-height:1}
+.mid.court{font-family:var(--display);font-size:var(--court-size)}
+.card.nope .inner{animation:nope .3s}
+@keyframes nope{25%{transform:translateX(-6%)}50%{transform:translateX(6%)}75%{transform:translateX(-3%)}}
+
+#fx{position:absolute;inset:0;width:100%;height:100%;z-index:5000}
+#win,#about{position:absolute;inset:0;z-index:6000;display:grid;place-items:center;padding:16px;background:rgba(8,24,19,.6)}
+.panel{
+  width:min(100%,340px);padding:26px 24px 22px;text-align:center;
+  background:var(--felt-deep);border:1px solid var(--brass);border-radius:14px;
+  box-shadow:0 20px 50px rgba(0,0,0,.5);
+}
+.panel h2{margin:0 0 6px;font-family:var(--display);font-weight:400;font-size:2rem;color:var(--brass);text-wrap:balance}
+.panel p{margin:0 0 18px;opacity:.85}
+.panel .stats{justify-content:center;margin-bottom:22px}
+.panel .stats div{align-items:center}
+.panel.wide{width:min(100%,440px);max-height:100%;overflow:auto;padding:22px 24px;text-align:left;outline:none}
+.panel.wide h2{text-align:center}
+.panel h3{margin:16px 0 6px;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--brass)}
+.panel ul{margin:0;padding-left:18px;opacity:.85;line-height:1.45}
+.panel li{margin:3px 0}
+.panel .alt{margin:14px 0 0}
+.panel .licences{margin-top:8px;font-size:.8em;opacity:.65}
+.panel .credit{margin:22px -24px -22px;padding:12px 24px;border-top:1px solid var(--line);text-align:center;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;opacity:.6}
+#about{position:fixed}
+.panel .actions{margin-top:20px;text-align:center}
+.panel kbd{font:inherit;font-size:.85em;padding:1px 6px;border:1px solid rgba(232,226,207,.35);border-radius:6px}
+
+footer{
+  display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;
+  padding:10px max(16px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+  border-top:1px solid var(--line);
+}
+.group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hint{margin:0;font-size:.82rem;opacity:.65}
+@media (max-width:820px){.hint{display:none} footer{justify-content:center;gap:8px} footer .group{display:contents}}   /* one flow of buttons packs the rows tighter */
+@media (max-width:420px){footer button{font-size:.82rem;padding:0 .8em} .seg button{padding:0 .7em} .stats{gap:10px}}
+button{
+  font:inherit;font-weight:600;font-size:.9rem;color:var(--chalk);
+  min-height:42px;padding:0 1.1em;border-radius:999px;cursor:pointer;
+  background:transparent;border:1px solid rgba(232,226,207,.35);
+}
+button:hover:not(:disabled){border-color:var(--brass);color:var(--brass)}
+button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+button:disabled{opacity:.38;cursor:default}
+button.primary{background:var(--brass);border-color:var(--brass);color:var(--ink)}
+button.primary:hover:not(:disabled){color:var(--ink);filter:brightness(1.08)}
+.seg{display:inline-flex;border:1px solid rgba(232,226,207,.35);border-radius:999px;padding:3px}
+.seg button{border:0;min-height:34px;padding:0 .9em}
+.seg button[aria-pressed="true"]{background:var(--chalk);color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.card,.inner{transition:none}.card.nope .inner{animation:none}}
+
+/* ---------- screens, menu and the multi-player games ---------- */
+.screen{
+  position:relative;flex:1;min-height:0;display:flex;flex-direction:column;
+  background:radial-gradient(120% 90% at 50% 0%,#27624f 0%,var(--felt) 45%,var(--felt-deep) 100%);
+}
+footer{background:var(--felt-deep)}
+.brand{display:flex;align-items:center;gap:12px}
+#home{min-height:34px;padding:0 .9em;font-size:.82rem}
+.menu{flex:1;overflow-y:auto;padding:28px 16px 32px}
+.menu-in{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.lede{margin:0;font-family:var(--display);font-size:clamp(1.5rem,5vw,2.2rem);line-height:1.15;text-wrap:balance}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.tile{
+  display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;
+  padding:20px;border-radius:14px;min-height:0;font-weight:500;
+  background:rgba(8,24,19,.35);border:1px solid var(--line);--cw:52px;--ch:73px;
+}
+.fan{display:flex;margin:4px 0 12px 6px}
+.fan .pc{margin-left:-18px}
+.fan .pc:first-child{margin-left:0;transform:rotate(-8deg) translateY(3px)}
+.fan .pc:last-child{transform:rotate(8deg) translateY(3px)}
+.prefs{display:flex;flex-direction:column;gap:10px}
+.prefs h2{margin:0;font-family:var(--display);font-weight:400;font-size:1.3rem;color:var(--brass)}
+.decks{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.deck{
+  display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;
+  padding:14px 16px;border-radius:14px;min-height:0;font-weight:600;font-size:.95rem;
+  background:rgba(8,24,19,.35);border:1px solid var(--line);--cw:44px;--ch:62px;
+}
+.deck[aria-checked="true"]{border-color:var(--brass);box-shadow:inset 0 0 0 1px var(--brass)}
+.deck .fan{margin-bottom:8px}
+.deck .fan .pc{margin-left:-12px}
+.t-name{font-family:var(--display);font-weight:400;font-size:1.5rem;color:var(--brass)}
+.t-desc{font-size:.92rem;line-height:1.4;color:var(--chalk)}
+.t-meta{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--chalk);opacity:.7;margin-top:4px}
+
+.pc{
+  display:block;position:relative;flex:0 0 auto;width:var(--cw);height:var(--ch);
+  font-size:calc(var(--cw)*.3);font-weight:400;color:inherit;
+  padding:0;border:0;background:none;min-height:0;border-radius:calc(var(--cw)*.08);
+}
+.pc .back{transform:none}
+.pc.ghost{
+  border:1.5px solid rgba(232,226,207,.2);display:grid;place-items:center;
+  color:rgba(232,226,207,.4);font-size:calc(var(--cw)*.42);
+}
+.pc.hot{outline:2px solid var(--brass);outline-offset:2px}
+button.pc{cursor:pointer}
+
+.seats{display:flex;justify-content:center;gap:8px;padding:10px 16px 0}
+.seat{
+  flex:1;max-width:140px;min-width:0;display:flex;flex-direction:column;align-items:center;
+  padding:6px 8px;border:1px solid var(--line);border-radius:10px;font-size:.76rem;line-height:1.3;
+  font-variant-numeric:tabular-nums;
+}
+.seat b{font-weight:600;font-size:.9rem}
+.seat.turn{border-color:var(--brass);color:var(--brass)}
+.board{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none}
+.board::-webkit-scrollbar{display:none}
+.status{margin:0;padding:6px 16px;min-height:2.9em;text-align:center;font-size:.88rem;line-height:1.35;text-wrap:balance}
+.hand{display:flex;flex-direction:column;align-items:center;padding:calc(var(--ch)*.2) 16px 10px}
+.hrow{display:flex;justify-content:center}
+.hrow + .hrow{margin-top:calc(var(--ch)*-.3)}
+.seg-l{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;opacity:.7}
+.hand .pc{margin-left:var(--ov,4px);transition:transform .12s}
+.hand .pc:first-child{margin-left:0}
+.hand .pc.sel{transform:translateY(-18%)}
+.hand .pc.can{transform:translateY(-12%)}
+.hand .pc.dim .face{filter:brightness(.7)}
+
+.srows{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 16px}
+.srow{position:relative;height:var(--ch)}
+.srow .pc{position:absolute;top:0}
+
+.piles{display:flex;justify-content:center;gap:18px;padding:12px 16px 6px}
+.pile{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.74rem;opacity:.9;font-variant-numeric:tabular-nums}
+.melds{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 12px;padding:8px 16px 12px}
+.meld{display:flex;padding:4px;min-height:0;border-radius:8px;border:1px dashed transparent;background:none}
+.meld .pc{margin-left:calc(var(--cw)*-.5)}
+.meld .pc:first-child{margin-left:0}
+.meld.hot{border-color:var(--brass)}
+.empty{margin:8px 0;font-size:.88rem;opacity:.6}
+
+.overlay{position:absolute;inset:0;z-index:6000;display:grid;place-items:center;padding:16px;background:rgba(8,24,19,.6)}
+.res{width:100%;margin:0 0 20px;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.92rem}
+.res th,.res td{padding:5px 8px;border-bottom:1px solid var(--line)}
+.res th{text-align:left;font-weight:600}
+.res td,.res thead th:not(:first-child){text-align:right}
+.res thead th{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;opacity:.7}
+@media (prefers-reduced-motion:reduce){.hand .pc{transition:none}}
+
+/* ---------- Crazy Eights, Hearts, FreeCell ---------- */
+.trick{display:flex;justify-content:center;gap:10px;padding:16px 16px 8px}
+.tslot{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.72rem;min-height:calc(var(--ch) + 1.6em)}
+.suits{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.suits button{font-size:1rem;min-height:52px}
+.fc{display:flex;flex-direction:column;gap:calc(var(--ch)*.2);padding:12px 16px}
+.fc-row{display:grid;grid-template-columns:repeat(8,var(--cw));gap:var(--g);justify-content:center;align-items:start}
+.fc-col{display:flex;flex-direction:column;min-height:var(--ch)}
+.fc-col .pc + .pc{margin-top:calc(var(--off) - var(--ch))}
+.pc.pick .face{background:#f6dc9a}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <button id="home" type="button" data-go="menu" data-i18n="games" hidden>Games</button>
+    <h1 id="title">Card Table</h1>
+  </div>
+  <dl class="stats" id="k-stats" hidden>
+    <div><dt data-i18n="time">Time</dt><dd id="time">0:00</dd></div>
+    <div><dt data-i18n="moves">Moves</dt><dd id="moves">0</dd></div>
+    <div><dt data-i18n="score" id="score-label">Score</dt><dd id="score">0</dd></div>
+  </dl>
+</header>
+
+<section class="screen" id="s-menu">
+  <div class="menu"><div class="menu-in">
+    <p class="lede" data-i18n="lede">Six games, one deck. Pick a table.</p>
+    <div class="tiles">
+      <button class="tile" type="button" data-go="klondike">
+        <span class="fan" data-fan="12,24,10"></span>
+        <span class="t-name" data-i18n="title_klondike">Klondike</span>
+        <span class="t-desc" data-i18n="desc_klondike">Classic solitaire. Build four suits from Ace to King.</span>
+        <span class="t-meta" data-i18n="players_1">1 player</span>
+      </button>
+      <button class="tile" type="button" data-go="freecell">
+        <span class="fan" data-fan="38,50,36"></span>
+        <span class="t-name" data-i18n="title_freecell">FreeCell</span>
+        <span class="t-desc" data-i18n="desc_freecell">Solitaire with every card face up and four free cells to park cards in.</span>
+        <span class="t-meta" data-i18n="players_1">1 player</span>
+      </button>
+      <button class="tile" type="button" data-go="rummy">
+        <span class="fan" data-fan="17,18,19"></span>
+        <span class="t-name" data-i18n="title_rummy">Rummy</span>
+        <span class="t-desc" data-i18n="desc_rummy">Draw, meld sets and runs, and empty your hand before the others. First to 100 points wins.</span>
+        <span class="t-meta" data-i18n="players_1to3">You and 1 to 3 computer players</span>
+      </button>
+      <button class="tile" type="button" data-go="eights">
+        <span class="fan" data-fan="7,20,33"></span>
+        <span class="t-name" data-i18n="title_eights">Crazy Eights</span>
+        <span class="t-desc" data-i18n="desc_eights">Match the suit or rank on the pile. Eights are wild and let you call a suit.</span>
+        <span class="t-meta" data-i18n="players_1to3">You and 1 to 3 computer players</span>
+      </button>
+      <button class="tile" type="button" data-go="hearts">
+        <span class="fan" data-fan="11,13,25"></span>
+        <span class="t-name" data-i18n="title_hearts">Hearts</span>
+        <span class="t-desc" data-i18n="desc_hearts">Take tricks, but dodge the hearts and the queen of spades. Low score wins.</span>
+        <span class="t-meta" data-i18n="players_3">You and 3 computer players</span>
+      </button>
+      <button class="tile" type="button" data-go="sevens">
+        <span class="fan" data-fan="31,32,33"></span>
+        <span class="t-name" data-i18n="title_sevens">Sevens</span>
+        <span class="t-desc" data-i18n="desc_sevens">Lay cards outward from the sevens, suit by suit. First empty hand wins the round.</span>
+        <span class="t-meta" data-i18n="players_1to3">You and 1 to 3 computer players</span>
+      </button>
+    </div>
+    <div class="prefs">
+      <h2 id="deck-title" data-i18n="deck_title">Card design</h2>
+      <div class="decks" role="radiogroup" aria-labelledby="deck-title">
+        <button class="deck" type="button" role="radio" data-deck="classic" aria-checked="true"><span data-i18n="deck_classic">Classic</span></button>
+        <button class="deck" type="button" role="radio" data-deck="midnight" aria-checked="false"><span data-i18n="deck_midnight">Midnight</span></button>
+        <button class="deck" type="button" role="radio" data-deck="meadow" aria-checked="false"><span data-i18n="deck_meadow">Meadow</span></button>
+        <button class="deck" type="button" role="radio" data-deck="cascade" aria-checked="false"><span data-i18n="deck_cascade">Cascade</span></button>
+        <button class="deck" type="button" role="radio" data-deck="large" aria-checked="false"><span data-i18n="deck_large">Large print</span></button>
+      </div>
+      <h2 id="lang-title" data-i18n="lang_title">Language</h2>
+      <div class="decks" role="radiogroup" aria-labelledby="lang-title">
+        <button class="deck" type="button" role="radio" data-lang="en" lang="en" aria-checked="true">English</button>
+        <button class="deck" type="button" role="radio" data-lang="es" lang="es" aria-checked="false">Español</button>
+        <button class="deck" type="button" role="radio" data-lang="fr" lang="fr" aria-checked="false">Français</button>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<section class="screen" id="s-klondike" hidden>
+<main id="stage">
+  <div id="area"><div id="board"></div></div>
+  <canvas id="fx" hidden></canvas>
+  <div id="win" hidden>
+    <div class="panel" role="dialog" aria-labelledby="win-title">
+      <h2 id="win-title" data-i18n="win_title">All four suits home</h2>
+      <p data-i18n="win_p">Every card is on its foundation.</p>
+      <dl class="stats">
+        <div><dt data-i18n="time">Time</dt><dd id="w-time">0:00</dd></div>
+        <div><dt data-i18n="moves">Moves</dt><dd id="w-moves">0</dd></div>
+        <div><dt data-i18n="score">Score</dt><dd id="w-score">0</dd></div>
+        <div id="w-bank-row" hidden><dt data-i18n="bank">Bank</dt><dd id="w-bank">$0</dd></div>
+      </dl>
+      <button class="primary" id="again" type="button" data-i18n="again">Deal again</button>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="group">
+    <button id="undo" type="button" data-i18n="undo">Undo</button>
+    <button id="finish" class="primary" type="button" data-i18n="finish" hidden>Finish for me</button>
+    <div class="seg" role="group" aria-label="Cards drawn from the stock" data-i18n-label="draw_group">
+      <button id="d1" type="button" aria-pressed="true" data-i18n="d1">Draw 1</button>
+      <button id="d3" type="button" aria-pressed="false" data-i18n="d3">Draw 3</button>
+    </div>
+    <button id="mv" type="button" aria-pressed="false">Vegas</button>
+    <button type="button" data-act="about" data-i18n="about">About</button>
+  </div>
+  <p class="hint" data-i18n="hint_klondike">Tap a card to send it where it fits, or drag it yourself.</p>
+  <div class="group">
+    <button class="sound-btn" type="button" aria-pressed="true">Sound on</button>
+    <button id="bank-reset" type="button" data-i18n="reset_bank" hidden>Reset bank</button>
+    <button id="restart" type="button" data-i18n="restart">Restart</button>
+    <button id="new" type="button" data-i18n="new_deal">New deal</button>
+  </div>
+</footer>
+</section>
+
+<section class="screen" id="s-rummy" hidden>
+  <div class="seats" data-el="seats"></div>
+  <div class="board">
+    <div class="piles" data-el="piles"></div>
+    <div class="melds" data-el="melds"></div>
+  </div>
+  <p class="status" data-el="status" aria-live="polite"></p>
+  <div class="hand" data-el="hand"></div>
+  <footer>
+    <div class="group">
+      <button class="primary" type="button" data-act="meld" data-i18n="meld">Meld</button>
+      <button type="button" data-act="discard" data-i18n="discard">Discard</button>
+      <button type="button" data-act="sort" data-i18n="sort_suit">Sort by suit</button>
+      <button type="button" data-act="about" data-i18n="about">About</button>
+    </div>
+    <p class="hint" data-i18n="hint_rummy">A set is 3 or 4 of a rank. A run is 3 or more in a row in one suit.</p>
+    <div class="group">
+      <button class="sound-btn" type="button" aria-pressed="true">Sound on</button>
+      <span class="seg-l" data-i18n="opponents">Opponents</span>
+      <div class="seg" role="group" aria-label="Number of computer players" data-i18n-label="opp_group">
+        <button type="button" data-opp="1" aria-pressed="false">1</button>
+        <button type="button" data-opp="2" aria-pressed="false">2</button>
+        <button type="button" data-opp="3" aria-pressed="true">3</button>
+      </div>
+      <button type="button" data-act="new" data-i18n="new_match">New match</button>
+    </div>
+  </footer>
+  <div class="overlay" data-el="over" hidden></div>
+</section>
+
+<section class="screen" id="s-sevens" hidden>
+  <div class="seats" data-el="seats"></div>
+  <div class="board"><div class="srows" data-el="rows"></div></div>
+  <p class="status" data-el="status" aria-live="polite"></p>
+  <div class="hand" data-el="hand"></div>
+  <footer>
+    <div class="group">
+      <button class="primary" type="button" data-act="pass" data-i18n="pass">Pass</button>
+      <button class="sound-btn" type="button" aria-pressed="true">Sound on</button>
+      <button type="button" data-act="about" data-i18n="about">About</button>
+    </div>
+    <p class="hint" data-i18n="hint_sevens">Play a seven, or the next card up or down in a suit already on the table.</p>
+    <div class="group">
+      <span class="seg-l" data-i18n="opponents">Opponents</span>
+      <div class="seg" role="group" aria-label="Number of computer players" data-i18n-label="opp_group">
+        <button type="button" data-opp="1" aria-pressed="false">1</button>
+        <button type="button" data-opp="2" aria-pressed="false">2</button>
+        <button type="button" data-opp="3" aria-pressed="true">3</button>
+      </div>
+      <button type="button" data-act="new" data-i18n="new_game">New game</button>
+    </div>
+  </footer>
+  <div class="overlay" data-el="over" hidden></div>
+</section>
+
+<section class="screen" id="s-eights" hidden>
+  <div class="seats" data-el="seats"></div>
+  <div class="board"><div class="piles" data-el="piles"></div></div>
+  <p class="status" data-el="status" aria-live="polite"></p>
+  <div class="hand" data-el="hand"></div>
+  <footer>
+    <div class="group">
+      <button class="primary" type="button" data-act="pass" data-i18n="pass">Pass</button>
+      <button class="sound-btn" type="button" aria-pressed="true">Sound on</button>
+      <button type="button" data-act="about" data-i18n="about">About</button>
+    </div>
+    <p class="hint" data-i18n="hint_eights">Match the suit or the rank. An eight goes on anything.</p>
+    <div class="group">
+      <span class="seg-l" data-i18n="opponents">Opponents</span>
+      <div class="seg" role="group" aria-label="Number of computer players" data-i18n-label="opp_group">
+        <button type="button" data-opp="1" aria-pressed="false">1</button>
+        <button type="button" data-opp="2" aria-pressed="false">2</button>
+        <button type="button" data-opp="3" aria-pressed="true">3</button>
+      </div>
+      <button type="button" data-act="new" data-i18n="new_match">New match</button>
+    </div>
+  </footer>
+  <div class="overlay" data-el="over" hidden></div>
+</section>
+
+<section class="screen" id="s-hearts" hidden>
+  <div class="seats" data-el="seats"></div>
+  <div class="board"><div class="trick" data-el="trick"></div></div>
+  <p class="status" data-el="status" aria-live="polite"></p>
+  <div class="hand" data-el="hand"></div>
+  <footer>
+    <div class="group">
+      <button class="primary" type="button" data-act="pass-cards" data-i18n="pass3">Pass 3 cards</button>
+      <button class="sound-btn" type="button" aria-pressed="true">Sound on</button>
+      <button type="button" data-act="about" data-i18n="about">About</button>
+    </div>
+    <p class="hint" data-i18n="hint_hearts">Each heart is 1 point and the queen of spades is 13. Low score wins.</p>
+    <div class="group">
+      <button type="button" data-act="new" data-i18n="new_game">New game</button>
+    </div>
+  </footer>
+  <div class="overlay" data-el="over" hidden></div>
+</section>
+
+<section class="screen" id="s-freecell" hidden>
+  <div class="board"><div class="fc" data-el="fc"></div></div>
+  <p class="status" data-el="status" aria-live="polite"></p>
+  <footer>
+    <div class="group">
+      <button type="button" data-act="undo" data-i18n="undo">Undo</button>
+      <button class="sound-btn" type="button" aria-pressed="true">Sound on</button>
+      <button type="button" data-act="about" data-i18n="about">About</button>
+    </div>
+    <p class="hint" data-i18n="hint_freecell">Tap a card, then tap where it should go.</p>
+    <div class="group">
+      <button type="button" data-act="restart" data-i18n="restart">Restart</button>
+      <button type="button" data-act="new" data-i18n="new_deal">New deal</button>
+    </div>
+  </footer>
+  <div class="overlay" data-el="over" hidden></div>
+</section>
+
+<div id="about" hidden><div class="panel wide" role="dialog" aria-labelledby="about-title" tabindex="-1"></div></div>
+
+<script>
+/* ---------- languages ----------
+   English is written once: static text stays in the HTML, marked data-i18n="key" (data-i18n-label for an
+   aria-label), and is captured from the page the first time setLang runs; text built in JavaScript lives in
+   LANGS.en. The other languages translate both sets under the same keys. {x} in a string is filled from the
+   args given to t(). Keys ending in _you are the form used when the player is the subject; _1 and _n are the
+   singular and plural forms picked by plural(). */
+const LANGS = {
+  en: {
+    tag: 'en', one: n => n === 1,
+    suits: ['spades', 'hearts', 'diamonds', 'clubs'],
+    ranks: ['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'],
+    seats: { 1: ['You', 'North'], 2: ['You', 'West', 'East'], 3: ['You', 'West', 'North', 'East'] },
+    about: {
+      klondike: {
+        p: 'Klondike is the classic patience game. Build each suit from Ace to King on the four foundations, drawing from the stock as you go. Not every deal can be won.',
+        how: ['Tap a card to send it where it fits, or drag it yourself.',
+          'Columns build down in alternating colours. Only a King may start an empty column.',
+          'Foundations build up by suit, starting with the Ace.',
+          'Tap the stock to draw one or three cards. When it runs out, tap it again to turn the waste back over.',
+          'Finish for me appears once every card is face up and the stock and waste are empty.'],
+        more: [['Scoring', ['Card onto a foundation: +10', 'Waste onto a column: +5', 'Turning a card face up: +5', 'Foundation back to a column: −15']],
+          ['Vegas', ['Each deal costs $52, and every card placed on a foundation pays $5. A card taken back off a foundation gives the $5 back.',
+            'Draw 1 allows a single pass through the stock; Draw 3 allows three. Once the passes are used up the stock stays empty.',
+            'The bank carries your winnings and losses from deal to deal. Restart and New deal both count the current deal first, but a deal with no moves made is free. Reset bank starts over at $0.',
+            'Undo stays available.']],
+          ['Keyboard', ['<kbd>Space</kbd> or <kbd>D</kbd> draws, <kbd>Ctrl</kbd>+<kbd>Z</kbd> or <kbd>U</kbd> undoes, <kbd>Esc</kbd> closes this panel.']]]
+      },
+      freecell: {
+        p: 'FreeCell is solitaire with nothing hidden: every card is dealt face up into eight columns, with four free cells and four foundations above. Almost every deal can be won.',
+        how: ['Tap a card, then tap where it should go: a column, a free cell or a foundation.',
+          'Columns build down in alternating colours. Any card may start an empty column.',
+          'Each free cell holds one card, which can come back down later.',
+          'Foundations build up by suit, starting with the Ace.',
+          'A run can move only if there are enough empty cells and columns to move it one card at a time. The status line says how many cards you can move.',
+          'Undo reverses moves, and Restart replays the same deal.']
+      },
+      rummy: {
+        p: 'Rummy is a race to empty your hand against one to three computer players. Draw, lay down sets and runs, and discard. The first to 100 points wins the match.',
+        how: ['On your turn, draw from the stock or take the top card of the discard pile.',
+          'Meld a set of 3 or 4 cards of one rank, or a run of 3 or more in sequence in one suit. Select the cards and press Meld.',
+          'Lay off cards onto any meld on the table by selecting them and tapping the meld.',
+          'End your turn by selecting one card and pressing Discard. You cannot discard the card you just took from the discard pile.',
+          'Going out scores the cards left in the other hands: face cards 10, aces 1, others their number.',
+          'When the stock runs out, the discard pile is turned over to make a new one, up to twice. After that the round ends with no score.']
+      },
+      sevens: {
+        p: 'Sevens, also called Fan Tan or Domino, lays the whole deck out in suit order. The player holding the 7 of diamonds starts.',
+        how: ['A seven starts its suit’s row. After that, play the next card up or down in a suit already on the table.',
+          'Cards you can play are raised. If you cannot play, press Pass.',
+          'The round ends when a hand is empty. Each card left in a hand is one penalty point.',
+          'The lowest total across the rounds leads.']
+      },
+      eights: {
+        p: 'Crazy Eights is a shedding game: match the top card of the pile, or change the suit with an eight. The first to empty their hand wins the round.',
+        how: ['Play a card that matches the suit or the rank of the top card of the pile. Cards you can play are raised.',
+          'An eight goes on anything. When you play one, choose the suit the next player must follow.',
+          'If you cannot play, draw one card. If you still cannot play, pass.',
+          'Going out scores the cards left in the other hands: eights 50, face cards 10, aces 1, others their number. The first to 100 wins the match.']
+      },
+      hearts: {
+        p: 'Hearts is a trick-taking game for four where the aim is to take as few points as possible. Each heart is 1 point and the queen of spades is 13.',
+        how: ['Before most rounds, select three cards to pass: left, then right, then across, then no pass.',
+          'The holder of the 2 of clubs leads it. You must follow suit if you can; the highest card of the suit led takes the trick and leads next.',
+          'No points can be played on the first trick, and hearts cannot be led until one has been played on another suit.',
+          'Taking all 26 points in a round, called shooting the moon, gives every other player 26 instead.',
+          'The game ends when someone reaches 100 points. The lowest score wins.']
+      }
+    },
+    s: {
+      app_name: 'Card Table: Six Games', title_menu: 'Card Table', about_of: 'About {g}', how: 'How to play', close: 'Close',
+      licences: 'Typefaces: Instrument Sans and Young Serif, under the SIL Open Font License. Built with Capacitor, under the MIT License.',
+      alt: 'Runs entirely on this device. No internet connection is needed, and your games are saved here.',
+      card: '{r} of {s}', cards_1: '{n} card', cards_n: '{n} cards',
+      sound_on: 'Sound on', sound_off: 'Sound off', sound_na: 'Sound unavailable', sound_tap: 'Tap for sound',
+      result: 'Result', player: 'Player', cards_left: 'Cards left', penalty: 'Penalty', this_round: 'This round', total: 'Total', next_round: 'Next round',
+      face_down: 'Face-down card', turn_waste: 'Turn the waste pile back over', no_passes: 'No passes left through the stock',
+      first: 'New round. {n} goes first.', first_you: 'New round. You go first.',
+      stock_out: 'The stock ran out.', stock_out_h: 'The stock ran out', nobody_scores: 'Nobody scores this round.',
+      drew_stock: '{n} drew from the stock.', drew_stock_you: 'You drew from the stock.',
+      took: '{n} took {c} from the discard pile.', took_you: 'You took {c} from the discard pile.',
+      melded: '{n} melded {c}.', melded_you: 'You melded {c}.', laid: '{n} laid off {c}.', laid_you: 'You laid off {c}.',
+      discarded: '{n} discarded {c}.', discarded_you: 'You discarded {c}.',
+      went_out: '{n} went out', went_out_you: 'You went out',
+      scored: '{n} scores {pts} points from the cards left in the other hands.', scored_you: 'You score {pts} points from the cards left in the other hands.',
+      scored8: '{n} scores {pts} points from the cards left in the other hands. Eights count 50.', scored8_you: 'You score {pts} points from the cards left in the other hands. Eights count 50.',
+      wins_match: '{n} wins the match.', wins_match_you: 'You win the match.',
+      draw_stock: 'Draw from the stock', turn_discard: 'Turn the discard pile over and draw', draw_card: 'Draw a card',
+      stock_n: 'Stock {n}', discard_pile: 'Discard', suit_n: 'Suit {s}', meld_of: 'Meld: {c}', no_melds: 'No melds on the table yet.',
+      playing: '{n} is playing.', to_play: '{n} to play.',
+      rummy_draw: 'Your turn: draw from the stock or take the discard.',
+      rummy_play: 'Select cards to meld, tap a meld to add to it, or select one card and discard.',
+      sort_rank: 'Sort by rank', no_discard_taken: 'You cannot discard the card you just took.',
+      holds7: '{n} holds the 7 of diamonds and starts.', holds7_you: 'You hold the 7 of diamonds and start.',
+      played: '{n} played {c}.', played_you: 'You played {c}.',
+      played_called: '{n} played {c} and called {s}.', played_called_you: 'You played {c} and called {s}.',
+      passed: '{n} passes.', passed_you: 'You pass.',
+      won_round: '{n} won the round', won_round_you: 'You won the round',
+      penalty_p: 'Each card left in a hand counts one penalty point. The lowest total leads.',
+      your_turn_play: 'Your turn: play a raised card.', your_lead: 'Your lead: play a raised card.',
+      no_card_pass: 'You have no card to play. Pass.', no_card_draw: 'You have no card to play. Draw from the stock.',
+      play_or_pass: 'Play a raised card or pass.', play_or_draw: 'Your turn: play a raised card, or draw.',
+      nothing_pass: 'Nothing to play. Pass.', nothing_draw_pass: 'Nothing to play and nothing to draw. Pass.',
+      no_draw: 'There are no cards left to draw.', drew: '{n} drew a card.', drew_you: 'You drew a card.',
+      nobody_h: 'Nobody can play', nobody_p: 'The stock is used up and every player passed. Nobody scores this round.',
+      choose_suit: 'Choose a suit', call_suit: 'Call a suit', call_p: 'The next player must follow it.',
+      new_round: 'New round.', no_pass: 'No passing this round.', received: 'You received {c}.',
+      holds2: '{n} holds the 2 of clubs and leads.', holds2_you: 'You hold the 2 of clubs and lead.',
+      took_trick: '{n} takes the trick.', took_trick_you: 'You take the trick.',
+      took_trick_1: '{n} takes the trick and 1 point.', took_trick_1_you: 'You take the trick and 1 point.',
+      took_trick_n: '{n} takes the trick and {pts} points.', took_trick_n_you: 'You take the trick and {pts} points.',
+      wins_game: '{n} wins the game', wins_game_you: 'You win the game',
+      moon: '{n} shot the moon', moon_you: 'You shot the moon', round_over: 'Round over',
+      moon_p: 'All 26 points were taken by one player, so everyone else gets 26.',
+      reached: 'A player reached {pts} points, and the lowest score wins.', ends_at: 'The game ends when a player reaches {pts} points.',
+      round_n: 'Round {n}', total_n: 'Total {n}',
+      pass_0: 'Select three cards to pass left to {n}.', pass_1: 'Select three cards to pass right to {n}.', pass_2: 'Select three cards to pass across to {n}.',
+      empty_cell: 'Empty free cell', empty_col: 'Empty column', foundation_of: '{s} foundation',
+      fc_status: 'Moves {m}. You can move up to {c} at once.', solved: 'Solved in {n} moves.'
+    }
+  },
+  es: {
+    tag: 'es-419', one: n => n === 1,
+    suits: ['picas', 'corazones', 'diamantes', 'tréboles'],
+    ranks: ['As', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jota', 'Reina', 'Rey'],
+    seats: { 1: ['Tú', 'Norte'], 2: ['Tú', 'Oeste', 'Este'], 3: ['Tú', 'Oeste', 'Norte', 'Este'] },
+    about: {
+      klondike: {
+        p: 'Klondike es el solitario clásico. Forma cada palo del as al rey en las cuatro fundaciones, robando del mazo sobre la marcha. No todos los repartos se pueden ganar.',
+        how: ['Toca una carta para enviarla a donde encaje, o arrástrala tú.',
+          'Las columnas bajan alternando colores. Solo un rey puede empezar una columna vacía.',
+          'Las fundaciones suben por palo, empezando por el as.',
+          'Toca el mazo para robar una o tres cartas. Cuando se acabe, tócalo otra vez para voltear el descarte.',
+          '«Terminar por mí» aparece cuando todas las cartas están boca arriba y el mazo y el descarte están vacíos.'],
+        more: [['Puntuación', ['Carta a una fundación: +10', 'Del descarte a una columna: +5', 'Voltear una carta: +5', 'De una fundación a una columna: −15']],
+          ['Vegas', ['Cada reparto cuesta $52 y cada carta puesta en una fundación paga $5. Si retiras una carta de una fundación, devuelves los $5.',
+            'Con «Robar 1» solo hay una pasada por el mazo; con «Robar 3» hay tres. Cuando se agotan, el mazo queda vacío.',
+            'La banca acumula lo ganado y lo perdido de reparto en reparto. «Reiniciar» y «Nuevo reparto» contabilizan primero el reparto en curso, pero un reparto sin jugadas es gratis. «Reiniciar banca» vuelve a $0.',
+            'Deshacer sigue disponible.']],
+          ['Teclado', ['<kbd>Espacio</kbd> o <kbd>D</kbd> roba, <kbd>Ctrl</kbd>+<kbd>Z</kbd> o <kbd>U</kbd> deshace, <kbd>Esc</kbd> cierra este panel.']]]
+      },
+      freecell: {
+        p: 'FreeCell es un solitario sin nada oculto: todas las cartas se reparten boca arriba en ocho columnas, con cuatro celdas libres y cuatro fundaciones arriba. Casi todos los repartos se pueden ganar.',
+        how: ['Toca una carta y luego toca adónde debe ir: una columna, una celda libre o una fundación.',
+          'Las columnas bajan alternando colores. Cualquier carta puede empezar una columna vacía.',
+          'Cada celda libre guarda una sola carta, que puede volver a bajar después.',
+          'Las fundaciones suben por palo, empezando por el as.',
+          'Una escalera solo se puede mover si hay suficientes celdas y columnas vacías para moverla carta por carta. La línea de estado dice cuántas cartas puedes mover.',
+          'Deshacer revierte las jugadas y Reiniciar vuelve a jugar el mismo reparto.']
+      },
+      rummy: {
+        p: 'Rummy es una carrera por quedarte sin cartas contra uno a tres jugadores de la computadora. Roba, baja grupos y escaleras, y descarta. El primero en llegar a 100 puntos gana la partida.',
+        how: ['En tu turno, roba del mazo o toma la carta de arriba del descarte.',
+          'Baja un grupo de 3 o 4 cartas del mismo número, o una escalera de 3 o más seguidas del mismo palo. Selecciona las cartas y presiona Bajar.',
+          'Añade cartas a cualquier combinación de la mesa seleccionándolas y tocando la combinación.',
+          'Termina tu turno seleccionando una carta y presionando Descartar. No puedes descartar la carta que acabas de tomar del descarte.',
+          'Quedarse sin cartas anota las cartas que quedaron en las otras manos: figuras 10, ases 1, las demás su número.',
+          'Cuando el mazo se acaba, el descarte se voltea para formar uno nuevo, hasta dos veces. Después de eso la ronda termina sin puntos.']
+      },
+      sevens: {
+        p: 'Sietes, también llamado Fan Tan o Dominó, consiste en extender toda la baraja en orden por palo. Empieza quien tiene el 7 de diamantes.',
+        how: ['Un siete abre la fila de su palo. Después, juega la carta siguiente hacia arriba o hacia abajo de un palo que ya esté en la mesa.',
+          'Las cartas que puedes jugar se levantan. Si no puedes jugar, presiona Pasar.',
+          'La ronda termina cuando una mano queda vacía. Cada carta que queda en una mano es un punto de penalización.',
+          'Va ganando el total más bajo a lo largo de las rondas.']
+      },
+      eights: {
+        p: 'Ochos locos es un juego de descarte: iguala la carta de arriba de la pila, o cambia el palo con un ocho. El primero en quedarse sin cartas gana la ronda.',
+        how: ['Juega una carta que iguale el palo o el número de la carta de arriba de la pila. Las cartas que puedes jugar se levantan.',
+          'Un ocho va sobre cualquier carta. Cuando juegas uno, elige el palo que el siguiente jugador debe seguir.',
+          'Si no puedes jugar, roba una carta. Si todavía no puedes jugar, pasa.',
+          'Quedarse sin cartas anota las cartas que quedaron en las otras manos: ochos 50, figuras 10, ases 1, las demás su número. El primero en llegar a 100 gana la partida.']
+      },
+      hearts: {
+        p: 'Corazones es un juego de bazas para cuatro en el que la meta es llevarse la menor cantidad de puntos posible. Cada corazón vale 1 punto y la reina de picas, 13.',
+        how: ['Antes de la mayoría de las rondas, elige tres cartas para pasar: a la izquierda, luego a la derecha, luego al frente, y luego sin pasar.',
+          'Quien tiene el 2 de tréboles sale con él. Debes seguir el palo si puedes; la carta más alta del palo de salida se lleva la baza y sale en la siguiente.',
+          'En la primera baza no se pueden jugar puntos, y no se puede salir con corazones hasta que alguien haya jugado uno sobre otro palo.',
+          'Llevarse los 26 puntos de una ronda hace que cada uno de los demás jugadores reciba 26 en su lugar.',
+          'El juego termina cuando alguien llega a 100 puntos. Gana el puntaje más bajo.']
+      }
+    },
+    s: {
+      games: 'Juegos', time: 'Tiempo', moves: 'Jugadas', score: 'Puntos',
+      lede: 'Seis juegos, una baraja. Elige una mesa.',
+      title_menu: 'Mesa de cartas', title_klondike: 'Klondike', title_freecell: 'FreeCell', title_rummy: 'Rummy', title_eights: 'Ochos locos', title_hearts: 'Corazones', title_sevens: 'Sietes',
+      desc_klondike: 'El solitario clásico. Forma los cuatro palos del as al rey.',
+      desc_freecell: 'Solitario con todas las cartas a la vista y cuatro celdas libres para apartar cartas.',
+      desc_rummy: 'Roba, baja grupos y escaleras, y quédate sin cartas antes que los demás. Gana el primero en llegar a 100 puntos.',
+      desc_eights: 'Iguala el palo o el número de la pila. Los ochos son comodines y te dejan pedir palo.',
+      desc_hearts: 'Gana bazas, pero evita los corazones y la reina de picas. Gana el puntaje más bajo.',
+      desc_sevens: 'Extiende las cartas desde los sietes, palo por palo. La primera mano vacía gana la ronda.',
+      players_1: '1 jugador', players_1to3: 'Tú y de 1 a 3 jugadores de la computadora', players_3: 'Tú y 3 jugadores de la computadora',
+      deck_title: 'Diseño de las cartas', deck_classic: 'Clásico', deck_midnight: 'Medianoche', deck_meadow: 'Pradera', deck_cascade: 'Cascada', deck_large: 'Letra grande',
+      lang_title: 'Idioma',
+      win_title: 'Los cuatro palos en casa', win_p: 'Todas las cartas están en su fundación.', again: 'Repartir de nuevo',
+      app_name: 'Mesa de cartas: seis juegos', about_of: 'Acerca de {g}', how: 'Cómo se juega', close: 'Cerrar',
+      licences: 'Tipografías: Instrument Sans y Young Serif, bajo la SIL Open Font License. Hecho con Capacitor, bajo la licencia MIT.',
+      alt: 'Funciona por completo en este dispositivo. No necesita conexión a internet, y tus partidas se guardan aquí.',
+      hint_klondike: 'Toca una carta para enviarla a donde encaje, o arrástrala tú.',
+      undo: 'Deshacer', finish: 'Terminar por mí', draw_group: 'Cartas que se roban del mazo', d1: 'Robar 1', d3: 'Robar 3', about: 'Acerca de',
+      bank: 'Banca', reset_bank: 'Reiniciar banca',
+      restart: 'Reiniciar', new_deal: 'Nuevo reparto',
+      meld: 'Bajar', discard: 'Descartar', sort_suit: 'Ordenar por palo', sort_rank: 'Ordenar por número',
+      hint_rummy: 'Un grupo son 3 o 4 cartas del mismo número. Una escalera son 3 o más seguidas del mismo palo.',
+      opponents: 'Rivales', opp_group: 'Número de jugadores de la computadora', new_match: 'Nueva partida', new_game: 'Nuevo juego', pass: 'Pasar',
+      hint_sevens: 'Juega un siete, o la carta siguiente hacia arriba o hacia abajo de un palo que ya esté en la mesa.',
+      hint_eights: 'Iguala el palo o el número. Un ocho va sobre cualquier carta.',
+      pass3: 'Pasar 3 cartas', hint_hearts: 'Cada corazón vale 1 punto y la reina de picas, 13. Gana el puntaje más bajo.',
+      hint_freecell: 'Toca una carta y luego toca adónde debe ir.',
+      card: '{r} de {s}', cards_1: '{n} carta', cards_n: '{n} cartas',
+      sound_on: 'Sonido activado', sound_off: 'Sonido apagado', sound_na: 'Sonido no disponible', sound_tap: 'Toca para activar el sonido',
+      result: 'Resultado', player: 'Jugador', cards_left: 'Cartas restantes', penalty: 'Penalización', this_round: 'Esta ronda', total: 'Total', next_round: 'Siguiente ronda',
+      face_down: 'Carta boca abajo', turn_waste: 'Voltear el descarte', no_passes: 'No quedan pasadas por el mazo',
+      first: 'Nueva ronda. Empieza {n}.', first_you: 'Nueva ronda. Empiezas tú.',
+      stock_out: 'Se acabó el mazo.', stock_out_h: 'Se acabó el mazo', nobody_scores: 'Nadie anota en esta ronda.',
+      drew_stock: '{n} robó del mazo.', drew_stock_you: 'Robaste del mazo.',
+      took: '{n} tomó {c} del descarte.', took_you: 'Tomaste {c} del descarte.',
+      melded: '{n} bajó {c}.', melded_you: 'Bajaste {c}.', laid: '{n} añadió {c}.', laid_you: 'Añadiste {c}.',
+      discarded: '{n} descartó {c}.', discarded_you: 'Descartaste {c}.',
+      went_out: '{n} se quedó sin cartas', went_out_you: 'Te quedaste sin cartas',
+      scored: '{n} anota {pts} puntos por las cartas que quedaron en las otras manos.', scored_you: 'Anotas {pts} puntos por las cartas que quedaron en las otras manos.',
+      scored8: '{n} anota {pts} puntos por las cartas que quedaron en las otras manos. Los ochos valen 50.', scored8_you: 'Anotas {pts} puntos por las cartas que quedaron en las otras manos. Los ochos valen 50.',
+      wins_match: '{n} gana la partida.', wins_match_you: 'Ganas la partida.',
+      draw_stock: 'Robar del mazo', turn_discard: 'Voltear el descarte y robar', draw_card: 'Robar una carta',
+      stock_n: 'Mazo {n}', discard_pile: 'Descarte', suit_n: 'Palo {s}', meld_of: 'Combinación: {c}', no_melds: 'Todavía no hay combinaciones en la mesa.',
+      playing: '{n} está jugando.', to_play: 'Juega {n}.',
+      rummy_draw: 'Tu turno: roba del mazo o toma el descarte.',
+      rummy_play: 'Selecciona cartas para bajar, toca una combinación para añadirle, o selecciona una carta y descarta.',
+      no_discard_taken: 'No puedes descartar la carta que acabas de tomar.',
+      holds7: '{n} tiene el 7 de diamantes y empieza.', holds7_you: 'Tienes el 7 de diamantes y empiezas.',
+      played: '{n} jugó {c}.', played_you: 'Jugaste {c}.',
+      played_called: '{n} jugó {c} y pidió {s}.', played_called_you: 'Jugaste {c} y pediste {s}.',
+      passed: '{n} pasa.', passed_you: 'Pasas.',
+      won_round: '{n} ganó la ronda', won_round_you: 'Ganaste la ronda',
+      penalty_p: 'Cada carta que queda en una mano cuenta un punto de penalización. Va ganando el total más bajo.',
+      your_turn_play: 'Tu turno: juega una carta levantada.', your_lead: 'Sales tú: juega una carta levantada.',
+      no_card_pass: 'No tienes ninguna carta para jugar. Pasa.', no_card_draw: 'No tienes ninguna carta para jugar. Roba del mazo.',
+      play_or_pass: 'Juega una carta levantada o pasa.', play_or_draw: 'Tu turno: juega una carta levantada o roba.',
+      nothing_pass: 'Nada que jugar. Pasa.', nothing_draw_pass: 'Nada que jugar ni que robar. Pasa.',
+      no_draw: 'No quedan cartas para robar.', drew: '{n} robó una carta.', drew_you: 'Robaste una carta.',
+      nobody_h: 'Nadie puede jugar', nobody_p: 'El mazo se agotó y todos pasaron. Nadie anota en esta ronda.',
+      choose_suit: 'Elige un palo', call_suit: 'Pide un palo', call_p: 'El siguiente jugador debe seguirlo.',
+      new_round: 'Nueva ronda.', no_pass: 'En esta ronda no se pasan cartas.', received: 'Recibiste {c}.',
+      holds2: '{n} tiene el 2 de tréboles y sale.', holds2_you: 'Tienes el 2 de tréboles y sales.',
+      took_trick: '{n} se lleva la baza.', took_trick_you: 'Te llevas la baza.',
+      took_trick_1: '{n} se lleva la baza y 1 punto.', took_trick_1_you: 'Te llevas la baza y 1 punto.',
+      took_trick_n: '{n} se lleva la baza y {pts} puntos.', took_trick_n_you: 'Te llevas la baza y {pts} puntos.',
+      wins_game: '{n} gana el juego', wins_game_you: 'Ganas el juego',
+      moon: '{n} se llevó todos los puntos', moon_you: 'Te llevaste todos los puntos', round_over: 'Fin de la ronda',
+      moon_p: 'Un solo jugador se llevó los 26 puntos, así que todos los demás reciben 26.',
+      reached: 'Un jugador llegó a {pts} puntos, y gana el puntaje más bajo.', ends_at: 'El juego termina cuando un jugador llega a {pts} puntos.',
+      round_n: 'Ronda {n}', total_n: 'Total {n}',
+      pass_0: 'Elige tres cartas para pasar a la izquierda, a {n}.', pass_1: 'Elige tres cartas para pasar a la derecha, a {n}.', pass_2: 'Elige tres cartas para pasar al frente, a {n}.',
+      empty_cell: 'Celda libre vacía', empty_col: 'Columna vacía', foundation_of: 'Fundación de {s}',
+      fc_status: 'Jugadas {m}. Puedes mover hasta {c} a la vez.', solved: 'Resuelto en {n} jugadas.'
+    }
+  },
+  fr: {
+    tag: 'fr', one: n => n <= 1,
+    suits: ['pique', 'cœur', 'carreau', 'trèfle'],
+    ranks: ['As', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Valet', 'Dame', 'Roi'],
+    seats: { 1: ['Vous', 'Nord'], 2: ['Vous', 'Ouest', 'Est'], 3: ['Vous', 'Ouest', 'Nord', 'Est'] },
+    about: {
+      klondike: {
+        p: 'Klondike est le solitaire classique. Montez chaque couleur de l’as au roi sur les quatre fondations en piochant dans le talon. Toutes les donnes ne peuvent pas être gagnées.',
+        how: ['Touchez une carte pour l’envoyer là où elle va, ou déplacez-la vous-même.',
+          'Les colonnes descendent en alternant les couleurs. Seul un roi peut commencer une colonne vide.',
+          'Les fondations montent par couleur, en commençant par l’as.',
+          'Touchez le talon pour piocher une ou trois cartes. Quand il est vide, touchez-le encore pour retourner la défausse.',
+          '« Terminer pour moi » apparaît quand toutes les cartes sont visibles et que le talon et la défausse sont vides.'],
+        more: [['Points', ['Carte posée sur une fondation : +10', 'De la défausse vers une colonne : +5', 'Carte retournée : +5', 'D’une fondation vers une colonne : −15']],
+          ['Vegas', ['Chaque donne coûte 52 $ et chaque carte posée sur une fondation rapporte 5 $. Reprendre une carte d’une fondation rend les 5 $.',
+            '« Piocher 1 » n’autorise qu’un seul passage dans le talon ; « Piocher 3 » en autorise trois. Une fois les passages épuisés, le talon reste vide.',
+            'La banque garde vos gains et vos pertes d’une donne à l’autre. « Recommencer » et « Nouvelle donne » comptent d’abord la donne en cours, mais une donne sans aucun coup est gratuite. « Banque à zéro » repart de 0 $.',
+            'Annuler reste disponible.']],
+          ['Clavier', ['<kbd>Espace</kbd> ou <kbd>D</kbd> pioche, <kbd>Ctrl</kbd>+<kbd>Z</kbd> ou <kbd>U</kbd> annule, <kbd>Échap</kbd> ferme ce panneau.']]]
+      },
+      freecell: {
+        p: 'FreeCell est un solitaire sans rien de caché : toutes les cartes sont distribuées face visible en huit colonnes, avec quatre cellules libres et quatre fondations au-dessus. Presque toutes les donnes peuvent être gagnées.',
+        how: ['Touchez une carte, puis touchez l’endroit où elle doit aller : une colonne, une cellule libre ou une fondation.',
+          'Les colonnes descendent en alternant les couleurs. N’importe quelle carte peut commencer une colonne vide.',
+          'Chaque cellule libre ne contient qu’une carte, qui peut redescendre plus tard.',
+          'Les fondations montent par couleur, en commençant par l’as.',
+          'Une suite ne peut bouger que s’il y a assez de cellules et de colonnes vides pour la déplacer carte par carte. La ligne d’état indique combien de cartes vous pouvez déplacer.',
+          'Annuler revient en arrière, et Recommencer rejoue la même donne.']
+      },
+      rummy: {
+        p: 'Le rami est une course pour vider sa main contre un à trois joueurs contrôlés par l’ordinateur. Piochez, posez des brelans et des suites, et défaussez. Le premier à 100 points gagne la partie.',
+        how: ['À votre tour, piochez dans le talon ou prenez la carte du dessus de la défausse.',
+          'Posez un brelan de 3 ou 4 cartes de même valeur, ou une suite de 3 cartes ou plus qui se suivent dans la même couleur. Sélectionnez les cartes et appuyez sur Poser.',
+          'Ajoutez des cartes à n’importe quelle combinaison sur la table en les sélectionnant puis en touchant la combinaison.',
+          'Terminez votre tour en sélectionnant une carte et en appuyant sur Défausser. Vous ne pouvez pas défausser la carte que vous venez de prendre dans la défausse.',
+          'Vider sa main rapporte les cartes restées dans les autres mains : figures 10, as 1, les autres leur valeur.',
+          'Quand le talon est vide, la défausse est retournée pour en faire un nouveau, jusqu’à deux fois. Ensuite la manche se termine sans points.']
+      },
+      sevens: {
+        p: 'Le domino, aussi appelé sept ou Fan Tan, consiste à étaler tout le paquet dans l’ordre, couleur par couleur. Le joueur qui a le 7 de carreau commence.',
+        how: ['Un sept ouvre la rangée de sa couleur. Ensuite, jouez la carte juste au-dessus ou au-dessous dans une couleur déjà sur la table.',
+          'Les cartes que vous pouvez jouer sont relevées. Si vous ne pouvez pas jouer, appuyez sur Passer.',
+          'La manche se termine quand une main est vide. Chaque carte restée en main compte un point de pénalité.',
+          'Le total le plus bas au fil des manches mène.']
+      },
+      eights: {
+        p: 'Le huit américain est un jeu de défausse : suivez la carte du dessus de la pile, ou changez de couleur avec un huit. Le premier à vider sa main gagne la manche.',
+        how: ['Jouez une carte de la même couleur ou de la même valeur que la carte du dessus de la pile. Les cartes que vous pouvez jouer sont relevées.',
+          'Un huit se pose sur n’importe quelle carte. Quand vous en jouez un, choisissez la couleur que le joueur suivant devra suivre.',
+          'Si vous ne pouvez pas jouer, piochez une carte. Si vous ne pouvez toujours pas jouer, passez.',
+          'Vider sa main rapporte les cartes restées dans les autres mains : huit 50, figures 10, as 1, les autres leur valeur. Le premier à 100 gagne la partie.']
+      },
+      hearts: {
+        p: 'La dame de pique est un jeu de plis à quatre où le but est de prendre le moins de points possible. Chaque cœur vaut 1 point et la dame de pique en vaut 13.',
+        how: ['Avant la plupart des manches, sélectionnez trois cartes à passer : à gauche, puis à droite, puis en face, puis sans échange.',
+          'Celui qui a le 2 de trèfle l’entame. Vous devez fournir la couleur si vous le pouvez ; la carte la plus haute de la couleur demandée remporte le pli et entame le suivant.',
+          'Aucun point ne peut être joué sur le premier pli, et on ne peut pas entamer à cœur tant qu’un cœur n’a pas été joué sur une autre couleur.',
+          'Prendre les 26 points d’une manche, le chelem, donne 26 points à chacun des autres joueurs à la place.',
+          'La partie se termine quand quelqu’un atteint 100 points. Le score le plus bas gagne.']
+      }
+    },
+    s: {
+      games: 'Jeux', time: 'Temps', moves: 'Coups', score: 'Score',
+      lede: 'Six jeux, un seul paquet. Choisissez une table.',
+      title_menu: 'Table de cartes', title_klondike: 'Klondike', title_freecell: 'FreeCell', title_rummy: 'Rami', title_eights: 'Huit américain', title_hearts: 'Dame de pique', title_sevens: 'Domino',
+      desc_klondike: 'Le solitaire classique. Montez les quatre couleurs de l’as au roi.',
+      desc_freecell: 'Un solitaire où toutes les cartes sont visibles, avec quatre cellules libres pour en mettre de côté.',
+      desc_rummy: 'Piochez, posez des brelans et des suites, et videz votre main avant les autres. Le premier à 100 points gagne.',
+      desc_eights: 'Suivez la couleur ou la valeur de la pile. Les huit sont des jokers et permettent de demander une couleur.',
+      desc_hearts: 'Remportez des plis, mais évitez les cœurs et la dame de pique. Le score le plus bas gagne.',
+      desc_sevens: 'Posez les cartes à partir des sept, couleur par couleur. La première main vide gagne la manche.',
+      players_1: '1 joueur', players_1to3: 'Vous et 1 à 3 joueurs contrôlés par l’ordinateur', players_3: 'Vous et 3 joueurs contrôlés par l’ordinateur',
+      deck_title: 'Style des cartes', deck_classic: 'Classique', deck_midnight: 'Minuit', deck_meadow: 'Prairie', deck_cascade: 'Cascade', deck_large: 'Gros caractères',
+      lang_title: 'Langue',
+      win_title: 'Les quatre couleurs sont rentrées', win_p: 'Toutes les cartes sont sur leur fondation.', again: 'Redistribuer',
+      app_name: 'Table de cartes : six jeux', about_of: 'À propos de {g}', how: 'Comment jouer', close: 'Fermer',
+      licences: 'Polices : Instrument Sans et Young Serif, sous licence SIL Open Font License. Réalisé avec Capacitor, sous licence MIT.',
+      alt: 'Fonctionne entièrement sur cet appareil. Aucune connexion internet n’est nécessaire, et vos parties sont enregistrées ici.',
+      hint_klondike: 'Touchez une carte pour l’envoyer là où elle va, ou déplacez-la vous-même.',
+      undo: 'Annuler', finish: 'Terminer pour moi', draw_group: 'Cartes piochées dans le talon', d1: 'Piocher 1', d3: 'Piocher 3', about: 'À propos',
+      bank: 'Banque', reset_bank: 'Banque à zéro',
+      restart: 'Recommencer', new_deal: 'Nouvelle donne',
+      meld: 'Poser', discard: 'Défausser', sort_suit: 'Trier par couleur', sort_rank: 'Trier par valeur',
+      hint_rummy: 'Un brelan, c’est 3 ou 4 cartes de même valeur. Une suite, c’est 3 cartes ou plus qui se suivent dans la même couleur.',
+      opponents: 'Adversaires', opp_group: 'Nombre de joueurs contrôlés par l’ordinateur', new_match: 'Nouvelle partie', new_game: 'Nouvelle partie', pass: 'Passer',
+      hint_sevens: 'Jouez un sept, ou la carte juste au-dessus ou au-dessous dans une couleur déjà sur la table.',
+      hint_eights: 'Suivez la couleur ou la valeur. Un huit se pose sur n’importe quelle carte.',
+      pass3: 'Passer 3 cartes', hint_hearts: 'Chaque cœur vaut 1 point et la dame de pique en vaut 13. Le score le plus bas gagne.',
+      hint_freecell: 'Touchez une carte, puis touchez l’endroit où elle doit aller.',
+      card: '{r} de {s}', cards_1: '{n} carte', cards_n: '{n} cartes',
+      sound_on: 'Son activé', sound_off: 'Son coupé', sound_na: 'Son indisponible', sound_tap: 'Touchez pour activer le son',
+      result: 'Résultat', player: 'Joueur', cards_left: 'Cartes en main', penalty: 'Pénalité', this_round: 'Cette manche', total: 'Total', next_round: 'Manche suivante',
+      face_down: 'Carte face cachée', turn_waste: 'Retourner la défausse', no_passes: 'Plus aucun passage dans le talon',
+      first: 'Nouvelle manche. {n} commence.', first_you: 'Nouvelle manche. Vous commencez.',
+      stock_out: 'Le talon est épuisé.', stock_out_h: 'Le talon est épuisé', nobody_scores: 'Personne ne marque cette manche.',
+      drew_stock: '{n} a pioché dans le talon.', drew_stock_you: 'Vous avez pioché dans le talon.',
+      took: '{n} a pris {c} dans la défausse.', took_you: 'Vous avez pris {c} dans la défausse.',
+      melded: '{n} a posé {c}.', melded_you: 'Vous avez posé {c}.', laid: '{n} a ajouté {c}.', laid_you: 'Vous avez ajouté {c}.',
+      discarded: '{n} a défaussé {c}.', discarded_you: 'Vous avez défaussé {c}.',
+      went_out: '{n} a vidé sa main', went_out_you: 'Vous avez vidé votre main',
+      scored: '{n} marque {pts} points grâce aux cartes restées dans les autres mains.', scored_you: 'Vous marquez {pts} points grâce aux cartes restées dans les autres mains.',
+      scored8: '{n} marque {pts} points grâce aux cartes restées dans les autres mains. Les huit comptent 50.', scored8_you: 'Vous marquez {pts} points grâce aux cartes restées dans les autres mains. Les huit comptent 50.',
+      wins_match: '{n} gagne la partie.', wins_match_you: 'Vous gagnez la partie.',
+      draw_stock: 'Piocher dans le talon', turn_discard: 'Retourner la défausse et piocher', draw_card: 'Piocher une carte',
+      stock_n: 'Talon {n}', discard_pile: 'Défausse', suit_n: 'Couleur {s}', meld_of: 'Combinaison : {c}', no_melds: 'Aucune combinaison sur la table pour l’instant.',
+      playing: '{n} joue.', to_play: 'À {n} de jouer.',
+      rummy_draw: 'À vous : piochez dans le talon ou prenez la défausse.',
+      rummy_play: 'Sélectionnez des cartes à poser, touchez une combinaison pour y ajouter, ou sélectionnez une carte et défaussez.',
+      no_discard_taken: 'Vous ne pouvez pas défausser la carte que vous venez de prendre.',
+      holds7: '{n} a le 7 de carreau et commence.', holds7_you: 'Vous avez le 7 de carreau et commencez.',
+      played: '{n} a joué {c}.', played_you: 'Vous avez joué {c}.',
+      played_called: '{n} a joué {c} et demandé {s}.', played_called_you: 'Vous avez joué {c} et demandé {s}.',
+      passed: '{n} passe.', passed_you: 'Vous passez.',
+      won_round: '{n} a gagné la manche', won_round_you: 'Vous avez gagné la manche',
+      penalty_p: 'Chaque carte restée en main compte un point de pénalité. Le total le plus bas mène.',
+      your_turn_play: 'À vous : jouez une carte relevée.', your_lead: 'À vous d’entamer : jouez une carte relevée.',
+      no_card_pass: 'Vous n’avez aucune carte à jouer. Passez.', no_card_draw: 'Vous n’avez aucune carte à jouer. Piochez dans le talon.',
+      play_or_pass: 'Jouez une carte relevée ou passez.', play_or_draw: 'À vous : jouez une carte relevée, ou piochez.',
+      nothing_pass: 'Rien à jouer. Passez.', nothing_draw_pass: 'Rien à jouer ni à piocher. Passez.',
+      no_draw: 'Il n’y a plus de cartes à piocher.', drew: '{n} a pioché une carte.', drew_you: 'Vous avez pioché une carte.',
+      nobody_h: 'Personne ne peut jouer', nobody_p: 'Le talon est épuisé et tout le monde a passé. Personne ne marque cette manche.',
+      choose_suit: 'Choisir une couleur', call_suit: 'Demandez une couleur', call_p: 'Le joueur suivant devra la suivre.',
+      new_round: 'Nouvelle manche.', no_pass: 'Pas d’échange de cartes cette manche.', received: 'Vous avez reçu {c}.',
+      holds2: '{n} a le 2 de trèfle et entame.', holds2_you: 'Vous avez le 2 de trèfle et entamez.',
+      took_trick: '{n} remporte le pli.', took_trick_you: 'Vous remportez le pli.',
+      took_trick_1: '{n} remporte le pli et 1 point.', took_trick_1_you: 'Vous remportez le pli et 1 point.',
+      took_trick_n: '{n} remporte le pli et {pts} points.', took_trick_n_you: 'Vous remportez le pli et {pts} points.',
+      wins_game: '{n} gagne la partie', wins_game_you: 'Vous gagnez la partie',
+      moon: '{n} a fait le chelem', moon_you: 'Vous avez fait le chelem', round_over: 'Fin de la manche',
+      moon_p: 'Un seul joueur a pris les 26 points, donc tous les autres en reçoivent 26.',
+      reached: 'Un joueur a atteint {pts} points, et le score le plus bas gagne.', ends_at: 'La partie se termine quand un joueur atteint {pts} points.',
+      round_n: 'Manche {n}', total_n: 'Total {n}',
+      pass_0: 'Sélectionnez trois cartes à passer à gauche, à {n}.', pass_1: 'Sélectionnez trois cartes à passer à droite, à {n}.', pass_2: 'Sélectionnez trois cartes à passer en face, à {n}.',
+      empty_cell: 'Cellule libre vide', empty_col: 'Colonne vide', foundation_of: 'Fondation {s}',
+      fc_status: 'Coups : {m}. Vous pouvez déplacer jusqu’à {c} à la fois.', solved: 'Résolu en {n} coups.'
+    }
+  }
+};
+const EN_DOM = {};   /* English static text, read from the page by setLang */
+let LANG = 'en';
+function t(k, a) {
+  const L = LANGS[LANG].s;
+  const s = L[k] !== undefined ? L[k] : EN_DOM[k] !== undefined ? EN_DOM[k] : LANGS.en.s[k] !== undefined ? LANGS.en.s[k] : k;
+  return a ? s.replace(/\{(\w+)\}/g, (m, x) => a[x] !== undefined ? a[x] : m) : s;
+}
+const plural = (k, n, a) => t(LANGS[LANG].one(n) ? k + '_1' : k + '_n', Object.assign({ n }, a));
+/* tp words a key about player p of game state S: the _you form for the player's own seat, else {n} is the seat name */
+const tp = (S, p, k, a) => t(p === 0 ? k + '_you' : k, Object.assign({ n: S.names[p] }, a));
+/* A game's status message is kept as [key, args] parts and worded when rendered, so a saved game follows a later
+   language change. args.p is the player the message is about. A save from before the string table holds a plain string. */
+const say = (S, k, a) => { S.msg = [[k, a || {}]]; };
+const sayFirst = (S, k, a) => { if (!Array.isArray(S.msg)) S.msg = []; S.msg.unshift([k, a || {}]); };
+const said = S => typeof S.msg === 'string' ? S.msg :
+  (S.msg || []).map(([k, a]) => a.p === undefined ? t(k, a) : tp(S, a.p, k, a)).join(' ');
+/* Seat names and card words are shared with running games by reference, so a language change refills them in place. */
+const SUIT_WORDS = [], RANK_WORDS = [], SEATS = { 1: [], 2: [], 3: [] };
+const browserLang = () => (navigator.languages || [navigator.language || 'en']).map(l => String(l).slice(0, 2).toLowerCase()).find(l => LANGS[l]) || 'en';
+function setLang(code) {
+  if (!LANGS[code]) code = 'en';
+  LANG = code;
+  const D = LANGS[code], fill = (arr, src) => arr.splice(0, arr.length, ...src);
+  fill(SUIT_WORDS, D.suits); fill(RANK_WORDS, D.ranks); [1, 2, 3].forEach(n => fill(SEATS[n], D.seats[n]));
+  document.documentElement.lang = D.tag;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.dataset.i18n; if (!(k in EN_DOM)) EN_DOM[k] = el.innerHTML; el.innerHTML = t(k);
+  });
+  document.querySelectorAll('[data-i18n-label]').forEach(el => {
+    const k = el.dataset.i18nLabel; if (!(k in EN_DOM)) EN_DOM[k] = el.getAttribute('aria-label'); el.setAttribute('aria-label', t(k));
+  });
+  document.querySelectorAll('button[data-lang]').forEach(b => b.setAttribute('aria-checked', b.dataset.lang === code));
+  document.title = t('app_name');
+  if (App.current) document.querySelector('#title').textContent = t('title_' + App.current);
+  soundLabel();
+}
+
+/* ---------- sound (synthesised, no audio files) ---------- */
+let soundOn = true, ac = null, out = null, noiseBuf = null, silent = null, audioFailed = false;
+try { soundOn = localStorage.getItem('klondike-v1-sound') !== 'off'; } catch (e) {}
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function audio() {
+  if (!soundOn) return null;
+  try {
+    if (!ac) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { audioFailed = true; return null; }
+      ac = new AC();
+      const comp = ac.createDynamicsCompressor();
+      out = ac.createGain(); out.gain.value = 1.6;
+      out.connect(comp); comp.connect(ac.destination);
+      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.3), ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      ac.onstatechange = soundLabel;
+    }
+    return ac;
+  } catch (e) { audioFailed = true; return null; }
+}
+/* Runs inside every tap, click and key press: browsers only let audio start from one. */
+function unlock() {
+  const a = audio(); if (!a) return;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  if (a.state !== 'running') { try { const p = a.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  if (isIOS && !silent) {
+    /* A silent looping clip keeps iPhone and iPad audio on even with the ring switch set to silent. */
+    try {
+      const n = 4000, buf = new Uint8Array(44 + n), v = new DataView(buf.buffer);
+      const w = (o, t) => { for (let i = 0; i < t.length; i++) buf[o + i] = t.charCodeAt(i); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+      v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+      v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+      buf.fill(128, 44);
+      silent = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+      silent.loop = true; silent.setAttribute('playsinline', '');
+      const p = silent.play(); if (p && p.catch) p.catch(() => { silent = null; });
+    } catch (e) { silent = null; }
+  }
+}
+function play(fn) {
+  const a = audio(); if (!a) return;
+  if (a.state === 'running') { fn(a); return; }
+  try { const p = a.resume(); if (p && p.then) p.then(() => fn(a)).catch(() => {}); } catch (e) {}
+}
+function noise(freq, dur, vol, when, type) {
+  play(a => {
+    const t = a.currentTime + (when || 0);
+    const src = a.createBufferSource(); src.buffer = noiseBuf;
+    const f = a.createBiquadFilter(); f.type = type || 'bandpass'; f.frequency.value = freq; f.Q.value = 0.9;
+    const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(out);
+    src.start(t); src.stop(t + dur + 0.02);
+  });
+}
+function tone(freq, dur, vol, when, type) {
+  play(a => {
+    const t = a.currentTime + (when || 0);
+    const o = a.createOscillator(); o.type = type || 'sine'; o.frequency.value = freq;
+    const g = a.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(out);
+    o.start(t); o.stop(t + dur + 0.02);
+  });
+}
+function soundLabel() {
+  const s = t(!soundOn ? 'sound_off' : audioFailed ? 'sound_na' : (ac && ac.state !== 'running') ? 'sound_tap' : 'sound_on');
+  document.querySelectorAll('.sound-btn').forEach(b => { b.setAttribute('aria-pressed', soundOn); b.textContent = s; });
+}
+const sfx = {
+  place() { noise(1600, 0.06, 0.5); tone(170, 0.05, 0.15); },
+  home(r) { noise(1600, 0.05, 0.4); tone(440 * Math.pow(2, (r - 1) / 12), 0.28, 0.12, 0, 'triangle'); },
+  draw() { noise(3000, 0.09, 0.25, 0, 'highpass'); noise(1400, 0.05, 0.35, 0.05); },
+  flip() { noise(2600, 0.05, 0.22, 0.1, 'highpass'); },
+  recycle() { noise(1200, 0.2, 0.3); },
+  undo() { noise(900, 0.07, 0.3); },
+  nope() { tone(130, 0.13, 0.22, 0, 'triangle'); },
+  shuffle() { for (let i = 0; i < 12; i++) noise(1800 + Math.random() * 1600, 0.05, 0.22, i * 0.045); },
+  win() { [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => tone(f, 0.6, 0.14, i * 0.12, 'triangle')); }
+};
+['pointerdown', 'pointerup', 'mousedown', 'touchstart', 'touchend', 'click', 'keydown'].forEach(t => document.addEventListener(t, unlock, { capture: true, passive: true }));
+
+
+/* ---------- shared card helpers ---------- */
+const SUITS = ['♠', '♥', '♦', '♣'].map(s => s + '︎');
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const cSuit = id => Math.floor(id / 13), cRank = id => id % 13 + 1;
+const cRed = id => cSuit(id) === 1 || cSuit(id) === 2;
+const cName = id => RANKS[cRank(id) - 1] + SUITS[cSuit(id)];
+const cWords = id => t('card', { r: RANK_WORDS[cRank(id) - 1], s: SUIT_WORDS[cSuit(id)] });
+function cardHTML(id, cls, tag, extra) {
+  tag = tag || 'div';
+  const r = RANKS[cRank(id) - 1], s = SUITS[cSuit(id)], court = cRank(id) > 10;
+  return '<' + tag + (tag === 'button' ? ' type="button"' : '') + ' class="pc ' + (cls || '') + '" data-id="' + id +
+    '" aria-label="' + cWords(id) + '"' + (extra || '') + '>' +
+    '<span class="face ' + (cRed(id) ? 'red' : 'blk') + '"><span class="idx"><b>' + r + '</b><i>' + s + '</i></span>' +
+    '<span class="mid' + (court ? ' court' : '') + '">' + (court ? r : s) + '</span></span></' + tag + '>';
+}
+function backHTML(cls, tag, extra) {
+  tag = tag || 'div';
+  return '<' + tag + (tag === 'button' ? ' type="button"' : '') + ' class="pc ' + (cls || '') + '"' + (extra || '') + '><span class="back"></span></' + tag + '>';
+}
+function shuffleInPlace(d) {
+  for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+  return d;
+}
+const shuffled = () => shuffleInPlace(Array.from({ length: 52 }, (_, i) => i));
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function loadKey(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+function saveKey(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function seatsHTML(S, names, label) {
+  return names.map((n, i) =>
+    '<div class="seat' + (S.turn === i && !S.over ? ' turn' : '') + '"><b>' + n + '</b><span>' + plural('cards', S.hands[i].length) +
+    '</span><span>' + label + ' ' + S.totals[i] + '</span></div>').join('');
+}
+function setFan(el, n, cw, W) {
+  const step = n > 1 ? Math.min(cw + 6, (W - cw) / (n - 1)) : cw;
+  el.style.setProperty('--ov', (step - cw) + 'px');
+}
+/* the player's hand as one or two fanned rows of card buttons; cls(id) gives the class, extra(id) any attributes */
+function handHTML(el, ids, cls, cw, W, extra) {
+  const rows = ids.length > 14 ? 2 : 1, half = Math.ceil(ids.length / rows);
+  el.innerHTML = [ids.slice(0, half), ids.slice(half)].filter(r => r.length).map(r =>
+    '<div class="hrow">' + r.map(id => cardHTML(id, cls(id), 'button', extra ? extra(id) : '')).join('') + '</div>').join('');
+  setFan(el, half, cw, W);
+  return rows;
+}
+function resultHTML(h, p, heads, rows, btn) {
+  return '<div class="panel" role="dialog" aria-label="' + t('result') + '"><h2>' + h + '</h2><p>' + p + '</p>' +
+    (rows ? '<table class="res"><thead><tr>' + heads.map(x => '<th>' + x + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map(r => '<tr><th>' + r[0] + '</th>' + r.slice(1).map(x => '<td>' + x + '</td>').join('') + '</tr>').join('') + '</tbody></table>' : '') +
+    '<button class="primary" type="button" data-act="next">' + btn + '</button></div>';
+}
+/* show an overlay in a named mode, rebuilding it only when the mode changes */
+function setOverlay(over, mode, html) {
+  if (!mode) { over.hidden = true; over.dataset.mode = ''; return; }
+  if (over.hidden || over.dataset.mode !== mode) { over.innerHTML = html(); over.dataset.mode = mode; over.hidden = false; }
+}
+
+/* ---------- About: one panel over any screen, filled for the current game ---------- */
+const CREDIT = 'Luis Valverde Badilla, San José, Costa Rica';
+let aboutOpener = null;
+const aboutOpen = () => !document.querySelector('#about').hidden;
+function aboutHTML(g) {
+  const a = LANGS[LANG].about[g] || LANGS.en.about[g];
+  const sec = (h, items) => '<h3>' + h + '</h3><ul>' + items.map(x => '<li>' + x + '</li>').join('') + '</ul>';
+  return '<h2 id="about-title">' + t('about_of', { g: t('title_' + g) }) + '</h2><p>' + a.p + '</p>' + sec(t('how'), a.how) +
+    (a.more || []).map(([h, items]) => sec(h, items)).join('') +
+    '<p class="alt">' + t('alt') + '</p><p class="alt licences">' + t('licences') + '</p>' +
+    '<div class="actions"><button class="primary" id="about-close" type="button">' + t('close') + '</button></div>' +
+    '<div class="credit">' + CREDIT + '</div>';
+}
+function openAbout(g, opener) {
+  const el = document.querySelector('#about'), panel = el.querySelector('.panel');
+  panel.innerHTML = aboutHTML(g); panel.scrollTop = 0;
+  aboutOpener = opener || null; el.hidden = false; panel.focus({ preventScroll: true });
+}
+function closeAbout() {
+  document.querySelector('#about').hidden = true;
+  if (aboutOpener) aboutOpener.focus(); aboutOpener = null;
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && aboutOpen()) closeAbout(); });
+
+/* ---------- screens ---------- */
+const App = {
+  current: null, games: {},
+  screens: ['menu', 'klondike', 'freecell', 'rummy', 'eights', 'hearts', 'sevens'],
+  show(name) {
+    if (!this.screens.includes(name)) name = 'menu';
+    if (this.current === name) return;
+    const prev = this.games[this.current];
+    if (prev && prev.leave) prev.leave();
+    if (aboutOpen()) closeAbout();
+    this.current = name;
+    document.querySelectorAll('.screen').forEach(s => { s.hidden = s.id !== 's-' + name; });
+    document.querySelector('#title').textContent = t('title_' + name);
+    document.querySelector('#home').hidden = name === 'menu';
+    document.querySelector('#k-stats').hidden = name !== 'klondike';
+    saveKey('cardtable-screen', name);
+    try { if (location.hash.slice(1) !== name) location.hash = name; } catch (e) {}
+    const g = this.games[name];
+    if (g && g.enter) g.enter();
+    soundLabel();
+  }
+};
+/* card design: a data-deck attribute on <html> that the card CSS keys off */
+const DECKS = ['classic', 'midnight', 'meadow', 'cascade', 'large'];
+function setDeck(name) {
+  if (!DECKS.includes(name)) name = 'classic';
+  document.documentElement.dataset.deck = name;
+  document.querySelectorAll('button[data-deck]').forEach(b => b.setAttribute('aria-checked', b.dataset.deck === name));
+  saveKey('cardtable-deck', name);
+}
+setDeck(loadKey('cardtable-deck'));
+setLang(loadKey('cardtable-lang') || browserLang());
+document.addEventListener('click', e => {
+  const go = e.target.closest('[data-go]');
+  if (go) { App.show(go.dataset.go); return; }
+  const deck = e.target.closest('button[data-deck]');
+  if (deck) { setDeck(deck.dataset.deck); sfx.place(); return; }
+  const lang = e.target.closest('button[data-lang]');
+  if (lang) { setLang(lang.dataset.lang); saveKey('cardtable-lang', LANG); sfx.place(); return; }   /* only an explicit pick is remembered; otherwise the device language applies */
+  const about = e.target.closest('[data-act="about"]');
+  if (about) { openAbout(App.current, about); return; }
+  if (e.target.closest('#about-close')) { closeAbout(); return; }
+  if (e.target.closest('.sound-btn')) {
+    soundOn = !soundOn;
+    try { localStorage.setItem('klondike-v1-sound', soundOn ? 'on' : 'off'); } catch (err) {}
+    if (soundOn) { unlock(); sfx.home(1); }
+    soundLabel();
+  }
+});
+
+</script>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const KEY = 'klondike-v1';
+const suit = cSuit, rank = cRank, red = cRed;   /* shared card helpers */
+const top = p => p[p.length - 1];
+
+const board = $('#board'), area = $('#area'), stage = $('#stage'), fx = $('#fx');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+
+let S, first, history = [], drawCount = 1, seconds = 0, timerOn = false, busy = false, won = false;
+let vegas = false, bank = 0;   /* Vegas: each deal costs $52, foundations pay $5 a card, limited stock passes; bank carries across deals */
+const ANTE = 52, PAY = 5;
+const passLimit = () => drawCount === 3 ? 3 : 1;
+const money = n => (n < 0 ? '−' : n > 0 ? '+' : '') + '$' + Math.abs(n);
+let M = { cw: 0, ch: 0, gap: 0, tabY: 0, py: 28 }, colBottom = [], fxRun = 0, pendingDeal = false;
+const X = c => c * (M.cw + M.gap);
+
+/* ---------- elements ---------- */
+const slots = {};
+const mkSlot = (key, text) => {
+  const el = document.createElement('div');
+  el.className = 'slot'; el.id = 'slot-' + key; el.textContent = text || '';
+  board.appendChild(el); slots[key] = el;
+};
+mkSlot('stock'); mkSlot('waste');
+for (let f = 0; f < 4; f++) mkSlot('f' + f, 'A');
+for (let c = 0; c < 7; c++) mkSlot('t' + c);
+
+const els = [];
+for (let id = 0; id < 52; id++) {
+  const el = document.createElement('div');
+  const r = RANKS[rank(id) - 1], s = SUITS[suit(id)], court = rank(id) > 10;
+  el.className = 'card down'; el.dataset.id = id;
+  el.innerHTML =
+    '<div class="inner"><div class="face ' + (red(id) ? 'red' : 'blk') + '">' +
+    '<span class="idx"><b>' + r + '</b><i>' + s + '</i></span>' +
+    '<span class="mid' + (court ? ' court' : '') + '">' + (court ? r : s) + '</span>' +
+    '<span class="idx flip"><b>' + r + '</b><i>' + s + '</i></span>' +
+    '</div><div class="back"></div></div>';
+  board.appendChild(el); els.push(el);
+}
+
+/* ---------- state ---------- */
+function deal() {
+  const deck = shuffled();
+  const tab = [[], [], [], [], [], [], []], up = Array(52).fill(false);
+  for (let c = 0; c < 7; c++) {
+    for (let r = 0; r <= c; r++) tab[c].push(deck.pop());
+    up[tab[c][c]] = true;
+  }
+  S = { stock: deck, waste: [], found: [[], [], [], []], tab, up, score: vegas ? -ANTE : 0, moves: 0, passes: 0 };
+  first = JSON.stringify(S);
+  history = []; seconds = 0; timerOn = false; won = false; busy = false;
+}
+const snapshot = () => ({ S, first, history, drawCount, seconds, won, vegas, bank });
+function save() { try { localStorage.setItem(KEY, JSON.stringify(snapshot())); } catch (e) {} }
+function valid(d) {
+  return d && d.S && Array.isArray(d.S.up) && d.S.up.length === 52 &&
+    Array.isArray(d.S.tab) && d.S.tab.length === 7 && Array.isArray(d.S.found) &&
+    Array.isArray(d.S.stock) && Array.isArray(d.S.waste) &&
+    d.S.stock.length + d.S.waste.length + d.S.found.flat().length + d.S.tab.flat().length === 52;
+}
+function pushHistory() { history.push(JSON.stringify(S)); if (history.length > 300) history.shift(); }
+
+/* ---------- layout ---------- */
+function measure() {
+  const cs = getComputedStyle(area), px = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight), py = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const availW = area.clientWidth - px, availH = area.clientHeight - py;
+  const gap = Math.max(4, Math.min(14, availW * 0.012));
+  let cw = Math.min(112, (availW - 6 * gap) / 7, availH / 4.4);
+  cw = Math.max(34, Math.floor(cw));
+  const ch = Math.round(cw * 1.4);
+  M = { cw, ch, gap, tabY: ch + Math.max(12, gap * 2), py };
+  board.style.setProperty('--cw', cw + 'px');
+  board.style.setProperty('--ch', ch + 'px');
+  board.style.width = (7 * cw + 6 * gap) + 'px';
+  board.classList.toggle('small', cw < 58);
+  const put = (el, x, y) => { el.style.transform = 'translate(' + x + 'px,' + y + 'px)'; };
+  put(slots.stock, X(0), 0); put(slots.waste, X(1), 0);
+  for (let f = 0; f < 4; f++) put(slots['f' + f], X(3 + f), 0);
+  for (let c = 0; c < 7; c++) put(slots['t' + c], X(c), M.tabY);
+}
+function lift(el) {
+  el.classList.add('lift');
+  clearTimeout(el._lt);
+  el._lt = setTimeout(() => el.classList.remove('lift'), 280 + (el._d || 0));
+}
+function place(id, x, y, z) {
+  const el = els[id], tr = 'translate3d(' + x + 'px,' + y + 'px,0)';
+  el.style.setProperty('--z', z);
+  if (el._t !== tr) { lift(el); el.style.transform = tr; el._t = tr; }
+  el._x = x; el._y = y;
+  const down = !S.up[id];
+  el.classList.toggle('down', down);
+  el.setAttribute('aria-label', down ? t('face_down') : cWords(id));
+}
+function layout() {
+  const { cw, ch, tabY } = M;
+  S.stock.forEach((id, i) => place(id, X(0), -Math.min(4, Math.floor(i / 6)), i));
+  const n = S.waste.length, shown = drawCount === 3 ? 3 : 1;
+  S.waste.forEach((id, i) => place(id, X(1) + Math.max(0, i - Math.max(0, n - shown)) * cw * 0.28, 0, i));
+  S.found.forEach((p, f) => p.forEach((id, i) => place(id, X(3 + f), 0, i)));
+  const upO = ch * 0.27, dnO = ch * 0.12;
+  const fanAvail = Math.max(ch * 0.5, area.clientHeight - M.py - tabY - ch);
+  let maxBottom = tabY + ch;
+  S.tab.forEach((col, c) => {
+    let need = 0;
+    for (let i = 1; i < col.length; i++) need += S.up[col[i - 1]] ? upO : dnO;
+    const k = need > fanAvail ? Math.max(0.6, fanAvail / need) : 1;
+    let y = tabY;
+    col.forEach((id, i) => {
+      if (i) y += (S.up[col[i - 1]] ? upO : dnO) * k;
+      place(id, X(c), y, i);
+    });
+    colBottom[c] = y + ch;
+    maxBottom = Math.max(maxBottom, y + ch);
+  });
+  board.style.height = maxBottom + 'px';
+}
+function relayout() {
+  board.classList.add('still');
+  measure(); layout();
+  void board.offsetWidth;
+  board.classList.remove('still');
+}
+function dealIn() {
+  els.forEach(el => { el.classList.add('still', 'down'); el.style.transform = 'translate3d(0,0,0)'; el._t = null; });
+  void board.offsetWidth;
+  els.forEach(el => el.classList.remove('still'));
+  let k = 0;
+  for (let r = 0; r < 7; r++) for (let c = r; c < 7; c++) {
+    const el = els[S.tab[c][r]];
+    el._d = k++ * 22; el.style.setProperty('--d', el._d + 'ms');
+  }
+  layout();
+  setTimeout(() => els.forEach(el => { el._d = 0; el.style.removeProperty('--d'); }), 1100);
+}
+
+/* ---------- rules ---------- */
+function locate(id) {
+  let i = S.waste.indexOf(id); if (i >= 0) return { t: 'w', i };
+  i = S.stock.indexOf(id); if (i >= 0) return { t: 's', i };
+  for (let f = 0; f < 4; f++) { i = S.found[f].indexOf(id); if (i >= 0) return { t: 'f', p: f, i }; }
+  for (let c = 0; c < 7; c++) { i = S.tab[c].indexOf(id); if (i >= 0) return { t: 't', p: c, i }; }
+  return null;
+}
+const pileOf = loc => loc.t === 'w' ? S.waste : loc.t === 'f' ? S.found[loc.p] : S.tab[loc.p];
+function grab(id, loc) {
+  if (loc.t === 'w' || loc.t === 'f') return top(pileOf(loc)) === id ? [id] : null;
+  if (loc.t === 't' && S.up[id]) return S.tab[loc.p].slice(loc.i);
+  return null;
+}
+function canFound(id, f) {
+  const p = S.found[f];
+  if (!p.length) return rank(id) === 1;
+  return suit(top(p)) === suit(id) && rank(id) === rank(top(p)) + 1;
+}
+function canTab(id, c) {
+  const col = S.tab[c];
+  if (!col.length) return rank(id) === 13;
+  const t = top(col);
+  return S.up[t] && red(t) !== red(id) && rank(t) === rank(id) + 1;
+}
+function doMove(loc, n, dest) {
+  pushHistory();
+  const src = pileOf(loc), cards = src.splice(src.length - n, n);
+  (dest.t === 'f' ? S.found[dest.p] : S.tab[dest.p]).push(...cards);
+  if (vegas) S.score = PAY * S.found.reduce((n, p) => n + p.length, 0) - ANTE;
+  else if (dest.t === 'f') S.score += 10;
+  else if (loc.t === 'w') S.score += 5;
+  else if (loc.t === 'f') S.score = Math.max(0, S.score - 15);
+  if (dest.t === 'f') sfx.home(rank(cards[0])); else sfx.place();
+  if (loc.t === 't' && src.length && !S.up[top(src)]) { S.up[top(src)] = true; if (!vegas) S.score += 5; sfx.flip(); }
+  S.moves++; timerOn = true;
+  after();
+}
+function draw() {
+  if (busy || won) return;
+  if (S.stock.length) {
+    pushHistory();
+    sfx.draw();
+    for (let i = 0; i < drawCount && S.stock.length; i++) { const id = S.stock.pop(); S.up[id] = true; S.waste.push(id); }
+  } else if (S.waste.length) {
+    if (!passesLeft()) { sfx.nope(); return; }
+    pushHistory(); sfx.recycle(); S.passes = (S.passes | 0) + 1;
+    while (S.waste.length) { const id = S.waste.pop(); S.up[id] = false; S.stock.push(id); }
+  } else return;
+  S.moves++; timerOn = true;
+  after();
+}
+const passesLeft = () => !vegas || (S.passes | 0) < passLimit() - 1;
+function after() {
+  layout(); updateUI(); save();
+  if (!won && S.found.every(p => p.length === 13)) { won = true; timerOn = false; updateUI(); save(); sfx.win(); celebrate(); }
+}
+function tap(id) {
+  const loc = locate(id);
+  if (!loc) return;
+  if (loc.t === 's') { draw(); return; }
+  const cards = grab(id, loc);
+  if (!cards) return;
+  if (cards.length === 1 && loc.t !== 'f') {
+    for (let f = 0; f < 4; f++) if (canFound(id, f)) { doMove(loc, 1, { t: 'f', p: f }); return; }
+  }
+  let best = -1;
+  for (let c = 0; c < 7; c++) {
+    if (loc.t === 't' && loc.p === c) continue;
+    if (!canTab(id, c)) continue;
+    if (S.tab[c].length) { best = c; break; }
+    if (best < 0 && !(loc.t === 't' && loc.i === 0)) best = c;
+  }
+  if (best >= 0) { doMove(loc, cards.length, { t: 't', p: best }); return; }
+  sfx.nope();
+  cards.forEach(c => {
+    const el = els[c];
+    el.classList.remove('nope'); void el.offsetWidth; el.classList.add('nope');
+    setTimeout(() => el.classList.remove('nope'), 320);
+  });
+}
+function undo() {
+  if (!history.length || busy || won) return;
+  S = JSON.parse(history.pop()); sfx.undo();
+  layout(); updateUI(); save();
+}
+const canFinish = () => !won && !S.stock.length && !S.waste.length && S.tab.every(col => col.every(id => S.up[id]));
+function finish() {
+  if (busy || !canFinish()) return;
+  busy = true; updateUI();
+  const step = () => {
+    if (!busy) return;
+    for (let c = 0; c < 7; c++) {
+      const col = S.tab[c];
+      if (!col.length) continue;
+      for (let f = 0; f < 4; f++) if (canFound(top(col), f)) {
+        doMove({ t: 't', p: c, i: col.length - 1 }, 1, { t: 'f', p: f });
+        if (won) { busy = false; updateUI(); } else setTimeout(step, 70);
+        return;
+      }
+    }
+    busy = false; updateUI();
+  };
+  step();
+}
+
+/* ---------- pointer input ---------- */
+let drag = null;
+board.addEventListener('pointerdown', e => {
+  if (busy || won || drag || e.button) return;
+  const el = e.target.closest('.card');
+  if (!el) return;
+  const id = +el.dataset.id, loc = locate(id);
+  if (!loc) return;
+  drag = { id, loc, cards: loc.t === 's' ? null : grab(id, loc), x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, moved: false, pid: e.pointerId };
+  try { board.setPointerCapture(e.pointerId); } catch (err) {}
+  e.preventDefault();
+});
+board.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  drag.dx = e.clientX - drag.x0; drag.dy = e.clientY - drag.y0;
+  if (!drag.moved) {
+    if (!drag.cards || Math.hypot(drag.dx, drag.dy) < 6) return;
+    drag.moved = true;
+    drag.cards.forEach(c => els[c].classList.add('drag'));
+  }
+  drag.cards.forEach(c => {
+    const el = els[c];
+    el.style.transform = 'translate3d(' + (el._x + drag.dx) + 'px,' + (el._y + drag.dy) + 'px,0)';
+    el._t = null;
+  });
+});
+function endDrag(e, cancelled) {
+  if (!drag || e.pointerId !== drag.pid) return;
+  const d = drag; drag = null;
+  if (!d.moved) { if (!cancelled) tap(d.id); return; }
+  d.cards.forEach(c => els[c].classList.remove('drag'));
+  const dest = cancelled ? null : dropTarget(d);
+  if (dest) doMove(d.loc, d.cards.length, dest); else layout();
+}
+board.addEventListener('pointerup', e => endDrag(e, false));
+board.addEventListener('pointercancel', e => endDrag(e, true));
+function dropTarget(d) {
+  const { cw, ch, tabY } = M, id = d.cards[0];
+  const lx = els[id]._x + d.dx, ly = els[id]._y + d.dy;
+  const ov = (x, y, w, h) =>
+    Math.max(0, Math.min(lx + cw, x + w) - Math.max(lx, x)) * Math.max(0, Math.min(ly + ch, y + h) - Math.max(ly, y));
+  let best = null, bestA = 0;
+  if (d.cards.length === 1) for (let f = 0; f < 4; f++) {
+    if ((d.loc.t === 'f' && d.loc.p === f) || !canFound(id, f)) continue;
+    const a = ov(X(3 + f), 0, cw, ch);
+    if (a > bestA) { bestA = a; best = { t: 'f', p: f }; }
+  }
+  for (let c = 0; c < 7; c++) {
+    if ((d.loc.t === 't' && d.loc.p === c) || !canTab(id, c)) continue;
+    const a = ov(X(c), tabY, cw, colBottom[c] - tabY);
+    if (a > bestA) { bestA = a; best = { t: 't', p: c }; }
+  }
+  return best;
+}
+slots.stock.addEventListener('click', draw);
+
+/* ---------- chrome ---------- */
+const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+function updateUI() {
+  $('#time').textContent = fmt(seconds);
+  $('#moves').textContent = S.moves;
+  $('#score-label').textContent = t(vegas ? 'bank' : 'score');   /* Vegas shows the running bank, deal included */
+  $('#score').textContent = vegas ? money(bank + S.score) : S.score;
+  $('#bank-reset').hidden = !vegas;
+  $('#bank-reset').disabled = busy || bank === 0;
+  $('#mv').setAttribute('aria-pressed', vegas);
+  $('#undo').disabled = !history.length || busy || won;
+  $('#restart').disabled = !history.length || busy;
+  $('#new').disabled = busy;
+  $('#finish').hidden = busy || !canFinish();
+  $('#d1').setAttribute('aria-pressed', drawCount === 1);
+  $('#d3').setAttribute('aria-pressed', drawCount === 3);
+  soundLabel();
+  const dead = !S.stock.length && !passesLeft();   /* Vegas: the stock is spent for this deal */
+  slots.stock.classList.toggle('dead', dead);
+  slots.stock.textContent = dead ? '✕' : S.waste.length ? '↻' : '';
+  slots.stock.setAttribute('aria-label', t(dead ? 'no_passes' : 'turn_waste'));
+  slots.stock.setAttribute('aria-disabled', dead);
+}
+function hideWin() { fxRun++; fx.hidden = true; $('#win').hidden = true; }
+function showWin() {
+  fx.hidden = true;
+  $('#w-time').textContent = fmt(seconds);
+  $('#w-moves').textContent = S.moves;
+  $('#w-score').textContent = vegas ? money(S.score) : S.score;
+  $('#w-bank-row').hidden = !vegas;
+  $('#w-bank').textContent = money(bank + S.score);
+  $('#win').hidden = false;
+  $('#again').focus();
+}
+function bankDeal() { if (vegas && S.moves > 0) bank += S.score; }   /* an untouched deal is free */
+function newDeal() {
+  if (busy) return;
+  bankDeal(); hideWin(); deal(); measure(); sfx.shuffle(); dealIn(); updateUI(); save();
+}
+function restart() {
+  if (busy || !history.length) return;
+  bankDeal(); hideWin();
+  S = JSON.parse(first); history = []; seconds = 0; timerOn = false; won = false;
+  layout(); updateUI(); save();
+}
+function setDraw(n) { drawCount = n; layout(); updateUI(); save(); }
+function setMode(v) {   /* the scoring rules differ from the first card, so a change of mode starts a fresh deal */
+  if (busy || v === vegas) return;
+  bankDeal(); vegas = v; hideWin(); deal(); measure(); sfx.shuffle(); dealIn(); updateUI(); save();
+}
+function resetBank() { if (busy || !bank) return; bank = 0; sfx.place(); updateUI(); save(); }
+$('#undo').addEventListener('click', undo);
+$('#finish').addEventListener('click', finish);
+$('#new').addEventListener('click', newDeal);
+$('#again').addEventListener('click', newDeal);
+$('#restart').addEventListener('click', restart);
+$('#d1').addEventListener('click', () => setDraw(1));
+$('#d3').addEventListener('click', () => setDraw(3));
+$('#mv').addEventListener('click', () => setMode(!vegas));
+$('#bank-reset').addEventListener('click', resetBank);
+
+/* ---------- about panel ---------- */
+
+document.addEventListener('keydown', e => {
+  if (App.current !== 'klondike') return;
+  if (aboutOpen() || e.target.closest('button')) return;
+  if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey) || e.key === 'u') { e.preventDefault(); undo(); }
+  else if (e.key === ' ' || e.key === 'd') { e.preventDefault(); draw(); }
+});
+setInterval(() => {
+  if (timerOn && !won && !document.hidden && App.current === 'klondike' && !aboutOpen()) { seconds++; $('#time').textContent = fmt(seconds); if (seconds % 10 === 0) save(); }
+}, 1000);
+
+/* ---------- winning cascade ---------- */
+function celebrate() {
+  if (reduced.matches) { showWin(); return; }
+  const run = ++fxRun, dpr = Math.min(2, window.devicePixelRatio || 1);
+  const sr = stage.getBoundingClientRect(), br = board.getBoundingClientRect();
+  const W = sr.width, H = sr.height, { cw, ch } = M;
+  fx.width = W * dpr; fx.height = H * dpr; fx.hidden = false;
+  const ctx = fx.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const css = getComputedStyle(document.documentElement);
+  const ivory = css.getPropertyValue('--ivory'), ink = css.getPropertyValue('--ink'), pip = css.getPropertyValue('--pip-red');
+  const order = [];
+  for (let r = 12; r >= 0; r--) for (let f = 0; f < 4; f++) order.push({ id: S.found[f][r], f });
+  const live = []; let n = 0, frame = 0, skip = false;
+  fx.onclick = () => { skip = true; };
+  const paint = c => {
+    const r = cw * 0.08;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(c.x, c.y, cw, ch, r); else ctx.rect(c.x, c.y, cw, ch);
+    ctx.fillStyle = ivory; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = red(c.id) ? pip : ink;
+    ctx.font = '700 ' + cw * 0.3 + 'px "Instrument Sans",system-ui,sans-serif';
+    ctx.fillText(RANKS[rank(c.id) - 1], c.x + cw * 0.24, c.y + ch * 0.16);
+    ctx.font = cw * 0.6 + 'px "Instrument Sans",system-ui,sans-serif';
+    ctx.fillText(SUITS[suit(c.id)], c.x + cw / 2, c.y + ch * 0.58);
+  };
+  const tick = () => {
+    if (run !== fxRun) return;
+    if (skip || frame > 520 || (n === 52 && !live.length)) { showWin(); return; }
+    if (frame % 5 === 0 && n < 52) {
+      const o = order[n++];
+      live.push({
+        id: o.id, x: br.left - sr.left + X(3 + o.f), y: br.top - sr.top,
+        vx: (2 + Math.random() * 4) * (Math.random() < 0.5 ? -1 : 1), vy: -Math.random() * 5
+      });
+    }
+    for (let i = live.length - 1; i >= 0; i--) {
+      const c = live[i];
+      c.vy += 0.5; c.x += c.vx; c.y += c.vy;
+      if (c.y + ch > H) { c.y = H - ch; c.vy *= -0.8; }
+      paint(c);
+      if (c.x < -cw || c.x > W) live.splice(i, 1);
+    }
+    frame++;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/* ---------- boot ---------- */
+function start(data) {
+  let d = valid(data) ? data : null;
+  if (!d) { try { const s = JSON.parse(localStorage.getItem(KEY)); if (valid(s)) d = s; } catch (e) {} }
+  measure();
+  if (d) {
+    S = d.S; first = d.first || JSON.stringify(d.S); history = Array.isArray(d.history) ? d.history : [];
+    drawCount = d.drawCount === 3 ? 3 : 1; seconds = d.seconds | 0; won = !!d.won; timerOn = !won && S.moves > 0;
+    vegas = !!d.vegas; bank = d.bank | 0;
+    board.classList.add('still'); layout(); void board.offsetWidth; board.classList.remove('still');
+    if (won) showWin();
+  } else {
+    deal(); save(); pendingDeal = true;      /* the screen is hidden at boot; enter() plays the deal */
+  }
+  updateUI();
+  let raf = 0;
+  const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(relayout); };
+  if (window.ResizeObserver) new ResizeObserver(onResize).observe(area); else window.addEventListener('resize', onResize);
+}
+App.games.klondike = {
+  enter() {
+    relayout(); updateUI();
+    if (pendingDeal) { pendingDeal = false; sfx.shuffle(); dealIn(); }
+  },
+  leave() {
+    if (!fx.hidden) { fxRun++; fx.hidden = true; showWin(); }   /* cut a running cascade straight to the result */
+  }
+};
+const hot = window.claude && window.claude.hot;
+if (hot && hot.snapshot) hot.snapshot(() => snapshot());
+if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
+})();
+</script>
+
+<script>
+/* ================= Rummy ================= */
+(() => {
+'use strict';
+const KEY = 'rummy-v1', TARGET = 100;
+const root = document.querySelector('#s-rummy');
+const el = n => root.querySelector('[data-el="' + n + '"]');
+let S = null, token = 0, sortMode = 'rank', opp = 3;
+const sel = new Set();
+const pip = id => Math.min(10, cRank(id));
+const last = a => a[a.length - 1];
+
+function deal(newMatch) {
+  const d = shuffled(), n = opp + 1, keep = S && !newMatch && S.n === n;
+  const hands = Array.from({ length: n }, () => []), per = n === 2 ? 10 : 7;
+  for (let i = 0; i < per * n; i++) hands[i % n].push(d.pop());
+  S = {
+    n, names: SEATS[opp], hands, stock: d, discard: [], melds: [], phase: 'draw', taken: -1, turn: 0,
+    over: false, winner: -1, won: 0, recycles: 0, matchOver: false, msg: '',
+    totals: keep ? S.totals : Array(n).fill(0), rounds: keep ? S.rounds : 0
+  };
+  S.discard.push(S.stock.pop());
+  S.turn = S.rounds % n;
+  say(S, 'first', { p: S.turn });
+  sel.clear();
+}
+const valid = d => d && Array.isArray(d.names) && Array.isArray(d.hands) && d.hands.length === d.names.length && d.n === d.names.length && Array.isArray(d.stock) && Array.isArray(d.melds) && Array.isArray(d.totals);
+
+/* rules */
+function isSet(c) { return c.length >= 3 && c.length <= 4 && c.every(x => cRank(x) === cRank(c[0])); }
+function isRun(c) {
+  if (c.length < 3 || !c.every(x => cSuit(x) === cSuit(c[0]))) return false;
+  const r = c.map(cRank).sort((a, b) => a - b);
+  return r.every((v, i) => !i || v === r[i - 1] + 1);
+}
+const isMeld = c => isSet(c) || isRun(c);
+const sortMeld = c => c.slice().sort((a, b) => cRank(a) - cRank(b) || cSuit(a) - cSuit(b));
+const take = (p, c) => { const h = S.hands[p]; h.splice(h.indexOf(c), 1); };
+function endRound(w) {
+  S.over = true; S.winner = w; S.rounds++;
+  if (w >= 0) {
+    S.won = S.hands.reduce((t, h) => t + h.reduce((a, c) => a + pip(c), 0), 0);
+    S.totals[w] += S.won;
+    if (S.totals[w] >= TARGET) S.matchOver = true;
+    if (w === 0) sfx.win();
+  }
+}
+function checkOut(p) { if (!S.hands[p].length) { endRound(p); return true; } return false; }
+function drawStock(p) {
+  if (!S.stock.length) {
+    if (S.discard.length > 1 && S.recycles < 2) {
+      const t = S.discard.pop();
+      S.stock = S.discard.reverse(); S.discard = [t]; S.recycles++;
+    } else { say(S, 'stock_out'); endRound(-1); return; }
+  }
+  S.hands[p].push(S.stock.pop());
+  S.taken = -1; S.phase = 'play';
+  say(S, 'drew_stock', { p });
+  sfx.draw();
+}
+function takeDiscard(p) {
+  const c = S.discard.pop();
+  S.hands[p].push(c); S.taken = c; S.phase = 'play';
+  say(S, 'took', { p, c: cName(c) });
+  sfx.draw();
+}
+function layMeld(p, cards) {
+  cards.forEach(c => take(p, c));
+  S.melds.push({ cards: sortMeld(cards) });
+  say(S, 'melded', { p, c: sortMeld(cards).map(cName).join(' ') });
+  sfx.place(); checkOut(p);
+}
+function layOff(p, cards, i) {
+  cards.forEach(c => take(p, c));
+  S.melds[i].cards = sortMeld(S.melds[i].cards.concat(cards));
+  say(S, 'laid', { p, c: cards.map(cName).join(' ') });
+  sfx.place(); checkOut(p);
+}
+function discard(p, c) {
+  take(p, c); S.discard.push(c);
+  say(S, 'discarded', { p, c: cName(c) });
+  sfx.place();
+  if (!checkOut(p)) { S.turn = (p + 1) % S.n; S.phase = 'draw'; S.taken = -1; }
+}
+
+/* computer players: one action per tick */
+function findMeld(h) {
+  let best = null;
+  for (let s = 0; s < 4; s++) {
+    const ids = h.filter(c => cSuit(c) === s).sort((a, b) => a - b);
+    let g = [];
+    ids.forEach((c, i) => {
+      if (i && c === ids[i - 1] + 1) g.push(c); else g = [c];
+      if (g.length >= 3 && (!best || g.length > best.length)) best = g.slice();
+    });
+  }
+  for (let r = 1; r <= 13; r++) {
+    const g = h.filter(c => cRank(c) === r);
+    if (g.length >= 3 && (!best || g.length > best.length)) best = g;
+  }
+  return best;
+}
+function findLayoff(h) {
+  for (const c of h) for (let i = 0; i < S.melds.length; i++) if (isMeld(S.melds[i].cards.concat(c))) return { c, i };
+  return null;
+}
+function useful(h, t) {
+  if (h.filter(c => cRank(c) === cRank(t)).length >= 2) return true;
+  const has = d => cRank(t) + d >= 1 && cRank(t) + d <= 13 && h.includes(t + d);
+  if ((has(-2) && has(-1)) || (has(-1) && has(1)) || (has(1) && has(2))) return true;
+  return S.melds.some(m => isMeld(m.cards.concat(t)));
+}
+function pickDiscard(h) {
+  let pool = h.filter(c => c !== S.taken);
+  if (!pool.length) pool = h;
+  let best = pool[0], bestU = Infinity;
+  pool.forEach(c => {
+    let u = 0;
+    h.forEach(o => {
+      if (o === c) return;
+      if (cRank(o) === cRank(c)) u += 2;
+      else if (cSuit(o) === cSuit(c)) { const d = Math.abs(cRank(o) - cRank(c)); if (d === 1) u += 2; else if (d === 2) u += 1; }
+    });
+    u -= pip(c) / 100;
+    if (u < bestU) { bestU = u; best = c; }
+  });
+  return best;
+}
+function aiStep(p) {
+  const h = S.hands[p];
+  if (S.phase === 'draw') {
+    if (S.discard.length && useful(h, last(S.discard))) takeDiscard(p); else drawStock(p);
+    return;
+  }
+  const m = findMeld(h);
+  if (m) { layMeld(p, m); return; }
+  const l = findLayoff(h);
+  if (l) { layOff(p, [l.c], l.i); return; }
+  discard(p, pickDiscard(h));
+}
+async function run() {
+  const my = ++token;
+  while (S && !S.over && S.turn !== 0) {
+    await wait(S.phase === 'draw' ? 750 : 600);
+    if (my !== token || App.current !== 'rummy') return;
+    aiStep(S.turn); render(); persist();
+  }
+}
+const persist = () => saveKey(KEY, { S, sortMode });
+function done() { render(); persist(); run(); }
+
+/* drawing */
+function overHTML() {
+  const w = S.winner;
+  let h, p;
+  if (w < 0) { h = t('stock_out_h'); p = t('nobody_scores'); }
+  else {
+    h = tp(S, w, 'went_out');
+    p = tp(S, w, 'scored', { pts: S.won });
+    if (S.matchOver) p += ' ' + tp(S, w, 'wins_match');
+  }
+  return resultHTML(h, p, [t('player'), t('cards_left'), t('score')], S.names.map((n, i) => [n, S.hands[i].length, S.totals[i]]), S.matchOver ? t('new_match') : t('next_round'));
+}
+function render() {
+  if (App.current !== 'rummy' || !S) return;
+  const W = root.clientWidth - 32;
+  const H = root.clientHeight - el('seats').offsetHeight - el('status').offsetHeight - root.querySelector('footer').offsetHeight;
+  const cw = Math.max(36, Math.floor(Math.min(88, W / 6.5, (H - 70) / 3.3 / 1.4))), ch = Math.round(cw * 1.4);
+  root.style.setProperty('--cw', cw + 'px'); root.style.setProperty('--ch', ch + 'px');
+  el('melds').style.setProperty('--cw', Math.round(cw * 0.72) + 'px');
+  el('melds').style.setProperty('--ch', Math.round(ch * 0.72) + 'px');
+  const mine = S.turn === 0 && !S.over, drawing = mine && S.phase === 'draw', playing = mine && S.phase === 'play';
+  const c = [...sel], topD = last(S.discard);
+  el('seats').innerHTML = seatsHTML(S, S.names, t('score'));
+  el('piles').innerHTML =
+    '<div class="pile">' + (S.stock.length
+      ? backHTML(drawing ? 'hot' : '', 'button', ' data-act="stock" aria-label="' + t('draw_stock') + '"')
+      : '<button type="button" class="pc ghost' + (drawing ? ' hot' : '') + '" data-act="stock" aria-label="' + t('turn_discard') + '">↻</button>') +
+    '<span>' + t('stock_n', { n: S.stock.length }) + '</span></div>' +
+    '<div class="pile">' + (topD !== undefined
+      ? cardHTML(topD, drawing ? 'hot' : '', 'button', ' data-act="discard-pile"')
+      : '<div class="pc ghost"></div>') + '<span>' + t('discard_pile') + '</span></div>';
+  el('melds').innerHTML = S.melds.length
+    ? S.melds.map((m, i) =>
+        '<button type="button" class="meld' + (playing && c.length && isMeld(m.cards.concat(c)) ? ' hot' : '') + '" data-meld="' + i +
+        '" aria-label="' + t('meld_of', { c: m.cards.map(cWords).join(', ') }) + '">' + m.cards.map(x => cardHTML(x, '', 'span')).join('') + '</button>').join('')
+    : '<p class="empty">' + t('no_melds') + '</p>';
+  let prompt = '';
+  if (!S.over) {
+    if (!mine) prompt = tp(S, S.turn, 'playing');
+    else if (drawing) prompt = t('rummy_draw');
+    else prompt = t('rummy_play');
+  }
+  el('status').textContent = [said(S), prompt].filter(Boolean).join(' ');
+  const hand = S.hands[0].slice().sort(sortMode === 'rank' ? (a, b) => cRank(a) - cRank(b) || cSuit(a) - cSuit(b) : (a, b) => a - b);
+  handHTML(el('hand'), hand, id => sel.has(id) ? 'sel' : '', cw, W, id => ' aria-pressed="' + sel.has(id) + '"');
+  root.querySelector('[data-act="meld"]').disabled = !(playing && isMeld(c));
+  root.querySelector('[data-act="discard"]').disabled = !(playing && c.length === 1);
+  root.querySelector('[data-act="sort"]').textContent = t(sortMode === 'rank' ? 'sort_suit' : 'sort_rank');
+  root.querySelectorAll('[data-opp]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.opp === S.n - 1));
+  setOverlay(el('over'), S.over ? 'over' : '', overHTML);
+}
+
+root.addEventListener('click', e => {
+  if (!S) return;
+  const a = e.target.closest('[data-act]'), act = a && a.dataset.act;
+  const o = e.target.closest('[data-opp]');
+  if (o) { opp = +o.dataset.opp; deal(true); sfx.shuffle(); done(); return; }
+  if (act === 'new') { deal(true); sfx.shuffle(); done(); return; }
+  if (act === 'next') { deal(S.matchOver); sfx.shuffle(); done(); return; }
+  if (act === 'sort') { sortMode = sortMode === 'rank' ? 'suit' : 'rank'; render(); persist(); return; }
+  if (S.over || S.turn !== 0) return;
+  if (S.phase === 'draw') {
+    if (act === 'stock') { drawStock(0); done(); }
+    else if (act === 'discard-pile' && S.discard.length) { takeDiscard(0); done(); }
+    return;
+  }
+  const c = [...sel];
+  if (act === 'meld') {
+    if (isMeld(c)) { sel.clear(); layMeld(0, c); done(); } else sfx.nope();
+    return;
+  }
+  if (act === 'discard') {
+    if (c.length !== 1) return;
+    if (c[0] === S.taken && S.hands[0].length > 1) {
+      sfx.nope(); say(S, 'no_discard_taken'); render(); return;
+    }
+    sel.clear(); discard(0, c[0]); done();
+    return;
+  }
+  const m = e.target.closest('[data-meld]');
+  if (m) {
+    const i = +m.dataset.meld;
+    if (c.length && isMeld(S.melds[i].cards.concat(c))) { sel.clear(); layOff(0, c, i); done(); } else sfx.nope();
+    return;
+  }
+  const h = e.target.closest('[data-el="hand"] [data-id]');
+  if (h) { const id = +h.dataset.id; if (sel.has(id)) sel.delete(id); else sel.add(id); render(); }
+});
+
+App.games.rummy = {
+  enter() {
+    if (!S) {
+      const d = loadKey(KEY);
+      if (d && valid(d.S)) { S = d.S; opp = S.n - 1; S.names = SEATS[opp]; sortMode = d.sortMode === 'suit' ? 'suit' : 'rank'; } else deal(true);
+    }
+    render(); run();
+  },
+  leave() { token++; }
+};
+if (window.ResizeObserver) new ResizeObserver(render).observe(root); else window.addEventListener('resize', render);
+})();
+</script>
+
+<script>
+/* ================= Sevens ================= */
+(() => {
+'use strict';
+const KEY = 'sevens-v1', START = 32; /* 7 of diamonds */
+const root = document.querySelector('#s-sevens');
+const el = n => root.querySelector('[data-el="' + n + '"]');
+let S = null, token = 0, opp = 3;
+
+function deal(keep) {
+  const d = shuffled(), n = opp + 1, names = SEATS[opp], hands = Array.from({ length: n }, () => []);
+  d.forEach((c, i) => hands[i % n].push(c));
+  const turn = hands.findIndex(h => h.includes(START));
+  keep = keep && S && S.n === n;
+  S = {
+    n, names, hands, lo: [0, 0, 0, 0], hi: [0, 0, 0, 0], empty: true, turn, over: false, winner: -1,
+    totals: keep ? S.totals : Array(n).fill(0), rounds: keep ? S.rounds : 0, msg: ''
+  };
+  say(S, 'holds7', { p: turn });
+}
+const valid = d => d && Array.isArray(d.names) && Array.isArray(d.hands) && d.hands.length === d.names.length && d.n === d.names.length && Array.isArray(d.lo) && Array.isArray(d.hi) && Array.isArray(d.totals);
+function playable(id) {
+  if (S.empty) return id === START;
+  const s = cSuit(id), r = cRank(id);
+  if (!S.lo[s]) return r === 7;
+  return r === S.lo[s] - 1 || r === S.hi[s] + 1;
+}
+function playCard(p, id) {
+  const h = S.hands[p], s = cSuit(id), r = cRank(id);
+  h.splice(h.indexOf(id), 1);
+  if (!S.lo[s]) S.lo[s] = S.hi[s] = 7; else if (r < S.lo[s]) S.lo[s] = r; else S.hi[s] = r;
+  S.empty = false;
+  say(S, 'played', { p, c: cName(id) });
+  sfx.place();
+  if (!h.length) {
+    S.over = true; S.winner = p; S.rounds++;
+    S.hands.forEach((x, i) => { S.totals[i] += x.length; });
+    if (p === 0) sfx.win();
+  } else S.turn = (p + 1) % S.n;
+}
+function pass(p) { say(S, 'passed', { p }); S.turn = (p + 1) % S.n; }
+function aiMove(p) {
+  const h = S.hands[p], opts = h.filter(playable);
+  if (!opts.length) { pass(p); return; }
+  let best = opts[0], bestV = -Infinity;
+  opts.forEach(c => {
+    const s = cSuit(c), r = cRank(c);
+    /* cards of my own that this play unlocks further along the same suit */
+    const beyond = h.filter(o => o !== c && cSuit(o) === s && (r === 7 || (r < 7 ? cRank(o) < r : cRank(o) > r))).length;
+    const v = beyond * 2 - (beyond ? 0 : 1) + Math.abs(r - 7) * 0.1;
+    if (v > bestV) { bestV = v; best = c; }
+  });
+  playCard(p, best);
+}
+async function run() {
+  const my = ++token;
+  while (S && !S.over && S.turn !== 0) {
+    await wait(750);
+    if (my !== token || App.current !== 'sevens') return;
+    aiMove(S.turn); render(); persist();
+  }
+}
+const persist = () => saveKey(KEY, { S });
+function done() { render(); persist(); run(); }
+
+function overHTML() {
+  const w = S.winner;
+  return resultHTML(tp(S, w, 'won_round'), t('penalty_p'),
+    [t('player'), t('cards_left'), t('penalty')], S.names.map((n, i) => [n, S.hands[i].length, S.totals[i]]), t('next_round'));
+}
+function render() {
+  if (App.current !== 'sevens' || !S) return;
+  const W = root.clientWidth - 32;
+  const H = root.clientHeight - el('seats').offsetHeight - el('status').offsetHeight - root.querySelector('footer').offsetHeight;
+  const hand = S.hands[0].slice().sort((a, b) => a - b);
+  const handRows = hand.length > 14 ? 2 : 1;
+  const cw = Math.max(34, Math.floor(Math.min(88, W / 6.5, (H - 70) / (5.25 + (handRows - 1) * 0.7) / 1.4))), ch = Math.round(cw * 1.4);
+  root.style.setProperty('--cw', cw + 'px'); root.style.setProperty('--ch', ch + 'px');
+  const step = Math.min(cw * 0.62, (W - cw) / 12);
+  const mine = S.turn === 0 && !S.over, can = mine && S.hands[0].some(playable);
+  el('seats').innerHTML = seatsHTML(S, S.names, t('penalty'));
+  let rows = '';
+  for (let s = 0; s < 4; s++) {
+    rows += '<div class="srow" style="width:' + (cw + 12 * step) + 'px" aria-label="' + SUIT_WORDS[s] + '">' +
+      '<div class="pc ghost" style="left:' + 6 * step + 'px">' + SUITS[s] + '</div>';
+    if (S.lo[s]) for (let r = S.lo[s]; r <= S.hi[s]; r++) rows += cardHTML(s * 13 + r - 1, '', 'div', ' style="left:' + (r - 1) * step + 'px"');
+    rows += '</div>';
+  }
+  el('rows').innerHTML = rows;
+  let prompt = '';
+  if (!S.over) prompt = !mine ? tp(S, S.turn, 'to_play') : can ? t('your_turn_play') : t('no_card_pass');
+  el('status').textContent = [said(S), prompt].filter(Boolean).join(' ');
+  handHTML(el('hand'), hand, id => mine && playable(id) ? 'can' : 'dim', cw, W);
+  root.querySelector('[data-act="pass"]').disabled = !(mine && !can);
+  root.querySelectorAll('[data-opp]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.opp === S.n - 1));
+  setOverlay(el('over'), S.over ? 'over' : '', overHTML);
+}
+root.addEventListener('click', e => {
+  if (!S) return;
+  const a = e.target.closest('[data-act]'), act = a && a.dataset.act;
+  const o = e.target.closest('[data-opp]');
+  if (o) { opp = +o.dataset.opp; deal(false); sfx.shuffle(); done(); return; }
+  if (act === 'new') { deal(false); sfx.shuffle(); done(); return; }
+  if (act === 'next') { deal(true); sfx.shuffle(); done(); return; }
+  if (S.over || S.turn !== 0) return;
+  if (act === 'pass') { if (!S.hands[0].some(playable)) { pass(0); done(); } return; }
+  const h = e.target.closest('[data-el="hand"] [data-id]');
+  if (!h) return;
+  const id = +h.dataset.id;
+  if (playable(id)) { playCard(0, id); done(); } else sfx.nope();
+});
+App.games.sevens = {
+  enter() {
+    if (!S) { const d = loadKey(KEY); if (d && valid(d.S)) { S = d.S; opp = S.n - 1; S.names = SEATS[opp]; } else deal(false); }
+    render(); run();
+  },
+  leave() { token++; }
+};
+if (window.ResizeObserver) new ResizeObserver(render).observe(root); else window.addEventListener('resize', render);
+})();
+</script>
+
+<script>
+/* ================= Crazy Eights ================= */
+(() => {
+'use strict';
+const KEY = 'eights-v1', TARGET = 200;
+const root = document.querySelector('#s-eights');
+const el = n => root.querySelector('[data-el="' + n + '"]');
+let S = null, token = 0, opp = 3;
+const val = c => cRank(c) === 8 ? 50 : Math.min(10, cRank(c));
+const top = () => S.discard[S.discard.length - 1];
+
+function deal(newMatch) {
+  const d = shuffled(), n = opp + 1, keep = S && !newMatch && S.n === n, per = n === 2 ? 7 : 5;
+  const hands = Array.from({ length: n }, () => []);
+  for (let i = 0; i < per * n; i++) hands[i % n].push(d.pop());
+  let k = d.length - 1;
+  while (cRank(d[k]) === 8) k--;            /* the starter card is never an eight */
+  const start = d.splice(k, 1)[0];
+  S = {
+    n, names: SEATS[opp], hands, stock: d, discard: [start], suit: cSuit(start), turn: 0,
+    drew: false, choosing: -1, passes: 0, over: false, winner: -1, won: 0, matchOver: false, msg: '',
+    totals: keep ? S.totals : Array(n).fill(0), rounds: keep ? S.rounds : 0
+  };
+  S.turn = S.rounds % n;
+  say(S, 'first', { p: S.turn });
+}
+const valid = d => d && Array.isArray(d.names) && Array.isArray(d.hands) && d.hands.length === d.names.length && d.n === d.names.length &&
+  Array.isArray(d.stock) && Array.isArray(d.discard) && d.discard.length > 0 && Array.isArray(d.totals);
+const playable = c => cRank(c) === 8 || cSuit(c) === S.suit || cRank(c) === cRank(top());
+const canDraw = () => S.stock.length > 0 || S.discard.length > 1;
+const mayPass = () => S.drew || !canDraw();
+function next() { S.turn = (S.turn + 1) % S.n; S.drew = false; }
+function play(p, c, suit) {
+  const h = S.hands[p];
+  h.splice(h.indexOf(c), 1); S.discard.push(c); S.passes = 0;
+  S.suit = cRank(c) === 8 ? suit : cSuit(c);
+  say(S, cRank(c) === 8 ? 'played_called' : 'played', { p, c: cName(c), s: SUIT_WORDS[S.suit] });
+  sfx.place();
+  if (!h.length) {
+    S.over = true; S.winner = p; S.rounds++;
+    S.won = S.hands.reduce((t, x) => t + x.reduce((a, y) => a + val(y), 0), 0);
+    S.totals[p] += S.won;
+    if (S.totals[p] >= TARGET) S.matchOver = true;
+    if (p === 0) sfx.win();
+  } else next();
+}
+function drawCard(p) {
+  if (!S.stock.length && S.discard.length > 1) {
+    const t = S.discard.pop(), d = S.discard;
+    S.stock = shuffleInPlace(d); S.discard = [t];
+  }
+  S.drew = true;
+  if (!S.stock.length) { say(S, 'no_draw'); return false; }
+  S.hands[p].push(S.stock.pop()); S.passes = 0;
+  say(S, 'drew', { p });
+  sfx.draw();
+  return true;
+}
+function pass(p) {
+  say(S, 'passed', { p });
+  if (++S.passes >= S.n) { S.over = true; S.winner = -1; S.rounds++; return; }
+  next();
+}
+function aiStep(p) {
+  const h = S.hands[p], opts = h.filter(playable);
+  const cnt = s => h.filter(c => cSuit(c) === s && cRank(c) !== 8).length;
+  if (opts.length) {
+    const non = opts.filter(c => cRank(c) !== 8);
+    if (non.length) { non.sort((a, b) => cnt(cSuit(b)) - cnt(cSuit(a)) || val(b) - val(a)); play(p, non[0]); }
+    else { let best = S.suit; [0, 1, 2, 3].forEach(x => { if (cnt(x) > cnt(best)) best = x; }); play(p, opts[0], best); }
+    return;
+  }
+  if (!S.drew) { drawCard(p); return; }
+  pass(p);
+}
+async function run() {
+  const my = ++token;
+  while (S && !S.over && S.turn !== 0) {
+    await wait(700);
+    if (my !== token || App.current !== 'eights') return;
+    aiStep(S.turn); render(); persist();
+  }
+}
+const persist = () => saveKey(KEY, { S });
+function done() { render(); persist(); run(); }
+
+function overHTML() {
+  const w = S.winner;
+  if (w < 0) return resultHTML(t('nobody_h'), t('nobody_p'), null, null, t('next_round'));
+  return resultHTML(tp(S, w, 'went_out'),
+    tp(S, w, 'scored8', { pts: S.won }) + (S.matchOver ? ' ' + tp(S, w, 'wins_match') : ''),
+    [t('player'), t('cards_left'), t('score')], S.names.map((n, i) => [n, S.hands[i].length, S.totals[i]]), S.matchOver ? t('new_match') : t('next_round'));
+}
+function pickHTML() {
+  return '<div class="panel" role="dialog" aria-label="' + t('choose_suit') + '"><h2>' + t('call_suit') + '</h2><p>' + t('call_p') + '</p><div class="suits">' +
+    [0, 1, 2, 3].map(x => '<button type="button" data-suit="' + x + '">' + SUITS[x] + ' ' + SUIT_WORDS[x] + '</button>').join('') + '</div></div>';
+}
+function render() {
+  if (App.current !== 'eights' || !S) return;
+  const W = root.clientWidth - 32;
+  const H = root.clientHeight - el('seats').offsetHeight - el('status').offsetHeight - root.querySelector('footer').offsetHeight;
+  const hand = S.hands[0].slice().sort((a, b) => a - b), rows = hand.length > 14 ? 2 : 1;
+  const cw = Math.max(34, Math.floor(Math.min(88, W / 6.5, (H - 70) / (2.55 + (rows - 1) * 0.7) / 1.4))), ch = Math.round(cw * 1.4);
+  root.style.setProperty('--cw', cw + 'px'); root.style.setProperty('--ch', ch + 'px');
+  const mine = S.turn === 0 && !S.over, can = mine && hand.some(playable);
+  el('seats').innerHTML = seatsHTML(S, S.names, t('score'));
+  el('piles').innerHTML =
+    '<div class="pile">' + (canDraw()
+      ? backHTML(mine && !S.drew ? 'hot' : '', 'button', ' data-act="stock" aria-label="' + t('draw_card') + '"')
+      : '<div class="pc ghost"></div>') + '<span>' + t('stock_n', { n: S.stock.length }) + '</span></div>' +
+    '<div class="pile">' + cardHTML(top()) + '<span>' + t('suit_n', { s: SUITS[S.suit] + ' ' + SUIT_WORDS[S.suit] }) + '</span></div>';
+  let prompt = '';
+  if (!S.over) {
+    if (!mine) prompt = tp(S, S.turn, 'to_play');
+    else if (can) prompt = t(S.drew ? 'play_or_pass' : 'play_or_draw');
+    else prompt = t(S.drew ? 'nothing_pass' : canDraw() ? 'no_card_draw' : 'nothing_draw_pass');
+  }
+  el('status').textContent = [said(S), prompt].filter(Boolean).join(' ');
+  handHTML(el('hand'), hand, id => mine && playable(id) ? 'can' : 'dim', cw, W);
+  root.querySelector('[data-act="pass"]').disabled = !(mine && mayPass());
+  root.querySelectorAll('[data-opp]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.opp === S.n - 1));
+  setOverlay(el('over'), S.over ? 'over' : S.choosing >= 0 ? 'pick' : '', S.over ? overHTML : pickHTML);
+}
+root.addEventListener('click', e => {
+  if (!S) return;
+  const o = e.target.closest('[data-opp]');
+  if (o) { opp = +o.dataset.opp; deal(true); sfx.shuffle(); done(); return; }
+  const a = e.target.closest('[data-act]'), act = a && a.dataset.act;
+  if (act === 'new') { deal(true); sfx.shuffle(); done(); return; }
+  if (act === 'next') { deal(S.matchOver); sfx.shuffle(); done(); return; }
+  if (S.over || S.turn !== 0) return;
+  const su = e.target.closest('[data-suit]');
+  if (su && S.choosing >= 0) { const c = S.choosing; S.choosing = -1; play(0, c, +su.dataset.suit); done(); return; }
+  if (S.choosing >= 0) return;
+  if (act === 'stock') { if (!S.drew) { drawCard(0); done(); } else sfx.nope(); return; }
+  if (act === 'pass') { if (mayPass()) { pass(0); done(); } return; }
+  const h = e.target.closest('[data-el="hand"] [data-id]');
+  if (!h) return;
+  const id = +h.dataset.id;
+  if (!playable(id)) { sfx.nope(); return; }
+  if (cRank(id) === 8) { S.choosing = id; render(); } else { play(0, id); done(); }
+});
+App.games.eights = {
+  enter() {
+    if (!S) { const d = loadKey(KEY); if (d && valid(d.S)) { S = d.S; opp = S.n - 1; S.names = SEATS[opp]; } else deal(true); }
+    render(); run();
+  },
+  leave() { token++; }
+};
+if (window.ResizeObserver) new ResizeObserver(render).observe(root); else window.addEventListener('resize', render);
+})();
+</script>
+
+<script>
+/* ================= Hearts ================= */
+(() => {
+'use strict';
+const KEY = 'hearts-v1', NAMES = SEATS[3], QS = 11, C2 = 40, LIMIT = 100;
+const OFFSET = [1, 3, 2];   /* who receives the passed cards: left, right, across */
+const root = document.querySelector('#s-hearts');
+const el = n => root.querySelector('[data-el="' + n + '"]');
+let S = null, token = 0;
+const sel = new Set();
+const hv = c => cRank(c) === 1 ? 14 : cRank(c);              /* aces are high */
+const pts = c => c === QS ? 13 : cSuit(c) === 1 ? 1 : 0;
+
+function deal(newGame) {
+  const d = shuffled(), keep = S && !newGame, hands = [[], [], [], []];
+  d.forEach((c, i) => hands[i % 4].push(c));
+  S = {
+    names: NAMES, hands, phase: 'pass', dir: 0, trick: [], turn: 0, taken: [0, 0, 0, 0], added: [0, 0, 0, 0],
+    broken: false, tricks: 0, over: false, matchOver: false, moon: -1, msg: '',
+    totals: keep ? S.totals : [0, 0, 0, 0], rounds: keep ? S.rounds : 0
+  };
+  S.dir = S.rounds % 4;
+  sel.clear();
+  say(S, 'new_round');
+  if (S.dir === 3) { startPlay(); sayFirst(S, 'no_pass'); }
+}
+const valid = d => d && Array.isArray(d.hands) && d.hands.length === 4 && Array.isArray(d.trick) && Array.isArray(d.taken) && Array.isArray(d.totals) && typeof d.phase === 'string';
+function startPlay() {
+  S.phase = 'play';
+  S.turn = S.hands.findIndex(h => h.includes(C2));
+  say(S, 'holds2', { p: S.turn });
+}
+function aiPass(h) {
+  const danger = c => c === QS ? 100 : cSuit(c) === 0 && hv(c) > 12 ? 90 : cSuit(c) === 1 ? 40 + hv(c) : hv(c);
+  return h.slice().sort((a, b) => danger(b) - danger(a)).slice(0, 3);
+}
+function doPass(mine) {
+  const out = [mine, aiPass(S.hands[1]), aiPass(S.hands[2]), aiPass(S.hands[3])], off = OFFSET[S.dir];
+  out.forEach((cs, p) => cs.forEach(c => S.hands[p].splice(S.hands[p].indexOf(c), 1)));
+  out.forEach((cs, p) => S.hands[(p + off) % 4].push(...cs));
+  const got = out[(4 - off) % 4];
+  startPlay();
+  sayFirst(S, 'received', { c: got.map(cName).join(' ') });
+  sfx.draw();
+}
+function legal(p, c) {
+  const h = S.hands[p];
+  if (!S.trick.length) {
+    if (S.tricks === 0) return c === C2;
+    return !(cSuit(c) === 1 && !S.broken && h.some(x => cSuit(x) !== 1));
+  }
+  const led = cSuit(S.trick[0].c);
+  if (h.some(x => cSuit(x) === led)) return cSuit(c) === led;
+  return !(S.tricks === 0 && pts(c) && h.some(x => !pts(x)));
+}
+function playCard(p, c) {
+  const h = S.hands[p];
+  h.splice(h.indexOf(c), 1); S.trick.push({ p, c });
+  if (cSuit(c) === 1) S.broken = true;
+  say(S, 'played', { p, c: cName(c) });
+  sfx.place();
+  if (S.trick.length === 4) S.phase = 'trickEnd'; else S.turn = (p + 1) % 4;
+}
+function endTrick() {
+  const led = cSuit(S.trick[0].c);
+  let w = S.trick[0];
+  S.trick.forEach(t => { if (cSuit(t.c) === led && hv(t.c) > hv(w.c)) w = t; });
+  const p = S.trick.reduce((a, t) => a + pts(t.c), 0);
+  S.taken[w.p] += p;
+  say(S, p === 0 ? 'took_trick' : p === 1 ? 'took_trick_1' : 'took_trick_n', { p: w.p, pts: p });
+  S.trick = []; S.tricks++; S.turn = w.p; S.phase = 'play';
+  if (S.tricks === 13) {
+    S.moon = S.taken.indexOf(26);
+    S.added = S.moon >= 0 ? S.taken.map((_, i) => i === S.moon ? 0 : 26) : S.taken.slice();
+    S.added.forEach((v, i) => { S.totals[i] += v; });
+    S.over = true; S.rounds++;
+    if (S.totals.some(t => t >= LIMIT)) { S.matchOver = true; if (S.totals[0] === Math.min(...S.totals)) sfx.win(); }
+  }
+}
+function aiPlay(p) {
+  const h = S.hands[p].filter(c => legal(p, c));
+  const lo = a => a.slice().sort((x, y) => hv(x) - hv(y))[0], hi = a => a.slice().sort((x, y) => hv(y) - hv(x))[0];
+  let pick;
+  if (!S.trick.length) {
+    const safe = h.filter(c => !(cSuit(c) === 0 && hv(c) >= 12));
+    pick = lo(safe.length ? safe : h);
+  } else {
+    const led = cSuit(S.trick[0].c), follow = h.filter(c => cSuit(c) === led);
+    if (follow.length) {
+      const win = Math.max(...S.trick.filter(t => cSuit(t.c) === led).map(t => hv(t.c)));
+      const under = follow.filter(c => hv(c) < win);
+      if (under.length) pick = hi(under);                       /* duck with the biggest card that still loses */
+      else {
+        const noQ = follow.filter(c => c !== QS), pool = noQ.length ? noQ : follow;
+        pick = S.trick.length === 3 ? hi(pool) : lo(pool);
+      }
+    } else if (h.includes(QS)) pick = QS;                        /* void in the suit: dump the worst card */
+    else { const hearts = h.filter(c => cSuit(c) === 1); pick = hi(hearts.length ? hearts : h); }
+  }
+  playCard(p, pick);
+}
+async function run() {
+  const my = ++token;
+  while (S && !S.over && (S.phase === 'trickEnd' || (S.phase === 'play' && S.turn !== 0))) {
+    await wait(S.phase === 'trickEnd' ? 1300 : 650);
+    if (my !== token || App.current !== 'hearts') return;
+    if (S.phase === 'trickEnd') endTrick(); else aiPlay(S.turn);
+    render(); persist();
+  }
+}
+const persist = () => saveKey(KEY, { S });
+function done() { render(); persist(); run(); }
+
+function overHTML() {
+  const low = Math.min(...S.totals), w = S.totals.indexOf(low);
+  const h = S.matchOver ? tp(S, w, 'wins_game') : S.moon >= 0 ? tp(S, S.moon, 'moon') : t('round_over');
+  const p = (S.moon >= 0 ? t('moon_p') + ' ' : '') + t(S.matchOver ? 'reached' : 'ends_at', { pts: LIMIT });
+  return resultHTML(h, p, [t('player'), t('this_round'), t('total')], NAMES.map((n, i) => [n, S.added[i], S.totals[i]]), S.matchOver ? t('new_game') : t('next_round'));
+}
+function render() {
+  if (App.current !== 'hearts' || !S) return;
+  const W = root.clientWidth - 32;
+  const H = root.clientHeight - el('seats').offsetHeight - el('status').offsetHeight - root.querySelector('footer').offsetHeight;
+  const cw = Math.max(34, Math.floor(Math.min(88, W / 6.5, (H - 90) / 2.5 / 1.4))), ch = Math.round(cw * 1.4);
+  root.style.setProperty('--cw', cw + 'px'); root.style.setProperty('--ch', ch + 'px');
+  const passing = S.phase === 'pass', mine = S.phase === 'play' && S.turn === 0 && !S.over;
+  el('seats').innerHTML = NAMES.map((n, i) =>
+    '<div class="seat' + (S.phase === 'play' && S.turn === i && !S.over ? ' turn' : '') + '"><b>' + n + '</b><span>' + t('round_n', { n: S.taken[i] }) +
+    '</span><span>' + t('total_n', { n: S.totals[i] }) + '</span></div>').join('');
+  let trick = '';
+  for (let i = 0; i < 4; i++) {
+    const x = S.trick[i];
+    trick += '<div class="tslot">' + (x ? cardHTML(x.c) : '<div class="pc ghost"></div>') + '<span>' + (x ? NAMES[x.p] : '&nbsp;') + '</span></div>';
+  }
+  el('trick').innerHTML = trick;
+  let prompt = '';
+  if (!S.over) {
+    if (passing) prompt = t('pass_' + S.dir, { n: NAMES[OFFSET[S.dir]] });
+    else if (mine) prompt = t(S.trick.length ? 'your_turn_play' : 'your_lead');
+    else if (S.phase === 'play') prompt = tp(S, S.turn, 'to_play');
+  }
+  el('status').textContent = [said(S), prompt].filter(Boolean).join(' ');
+  const hand = S.hands[0].slice().sort((a, b) => a - b);
+  handHTML(el('hand'), hand, id => passing ? (sel.has(id) ? 'sel' : '') : mine && legal(0, id) ? 'can' : 'dim', cw, W);
+  const pb = root.querySelector('[data-act="pass-cards"]');
+  pb.hidden = !passing; pb.disabled = sel.size !== 3;
+  setOverlay(el('over'), S.over ? 'over' : '', overHTML);
+}
+root.addEventListener('click', e => {
+  if (!S) return;
+  const a = e.target.closest('[data-act]'), act = a && a.dataset.act;
+  if (act === 'new') { deal(true); sfx.shuffle(); done(); return; }
+  if (act === 'next') { deal(S.matchOver); sfx.shuffle(); done(); return; }
+  if (S.over) return;
+  if (act === 'pass-cards') { if (S.phase === 'pass' && sel.size === 3) { const c = [...sel]; sel.clear(); doPass(c); done(); } return; }
+  const h = e.target.closest('[data-el="hand"] [data-id]');
+  if (!h) return;
+  const id = +h.dataset.id;
+  if (S.phase === 'pass') {
+    if (sel.has(id)) sel.delete(id); else if (sel.size < 3) sel.add(id); else sfx.nope();
+    render(); return;
+  }
+  if (S.phase !== 'play' || S.turn !== 0) return;
+  if (legal(0, id)) { playCard(0, id); done(); } else sfx.nope();
+});
+App.games.hearts = {
+  enter() {
+    if (!S) { const d = loadKey(KEY); if (d && valid(d.S)) { S = d.S; S.names = NAMES; } else deal(true); }
+    render(); run();
+  },
+  leave() { token++; }
+};
+if (window.ResizeObserver) new ResizeObserver(render).observe(root); else window.addEventListener('resize', render);
+})();
+</script>
+
+<script>
+/* ================= FreeCell ================= */
+(() => {
+'use strict';
+const KEY = 'freecell-v1';
+const root = document.querySelector('#s-freecell');
+const el = n => root.querySelector('[data-el="' + n + '"]');
+let S = null, first = '', hist = [], sel = null;
+const topOf = c => c[c.length - 1];
+const stacks = (a, b) => cRed(a) !== cRed(b) && cRank(a) === cRank(b) + 1;    /* b may sit on a */
+
+function deal() {
+  const d = shuffled(), cols = Array.from({ length: 8 }, () => []);
+  d.forEach((c, i) => cols[i % 8].push(c));
+  S = { cols, cells: [-1, -1, -1, -1], found: [0, 0, 0, 0], moves: 0, over: false };
+  auto();
+  first = JSON.stringify(S); hist = []; sel = null;
+}
+const valid = d => d && Array.isArray(d.cols) && d.cols.length === 8 && Array.isArray(d.cells) && Array.isArray(d.found);
+function runFrom(col, idx) { for (let i = idx; i < col.length - 1; i++) if (!stacks(col[i], col[i + 1])) return false; return true; }
+function capacity(destEmpty) {
+  const fc = S.cells.filter(x => x < 0).length;
+  let ec = S.cols.filter(c => !c.length).length;
+  if (destEmpty) ec--;
+  return (fc + 1) * Math.pow(2, Math.max(0, ec));
+}
+const cardsOf = s => s.t === 'cell' ? [S.cells[s.i]] : S.cols[s.i].slice(s.idx);
+const holds = s => s.t === 'cell' ? S.cells[s.i] >= 0 : s.idx < S.cols[s.i].length && runFrom(S.cols[s.i], s.idx);
+function canMove(s, t) {
+  const cs = cardsOf(s), lead = cs[0];
+  if (t.t === 'found') return cs.length === 1 && S.found[cSuit(lead)] === cRank(lead) - 1;
+  if (t.t === 'cell') return cs.length === 1 && S.cells[t.i] < 0;
+  if (s.t === 'col' && s.i === t.i) return false;
+  const col = S.cols[t.i];
+  if (col.length && !stacks(topOf(col), lead)) return false;
+  return cs.length <= capacity(!col.length);
+}
+/* send cards to the foundations when nothing could still need them */
+function auto() {
+  const safe = c => {
+    const r = cRank(c);
+    if (S.found[cSuit(c)] !== r - 1) return false;
+    if (r <= 2) return true;
+    return (cRed(c) ? [0, 3] : [1, 2]).every(x => S.found[x] >= r - 1);
+  };
+  let moved = true;
+  while (moved) {
+    moved = false;
+    S.cells.forEach((c, i) => { if (c >= 0 && safe(c)) { S.cells[i] = -1; S.found[cSuit(c)]++; moved = true; } });
+    S.cols.forEach(col => { if (col.length && safe(topOf(col))) { S.found[cSuit(col.pop())]++; moved = true; } });
+  }
+}
+function apply(s, t) {
+  hist.push(JSON.stringify(S)); if (hist.length > 300) hist.shift();
+  const cs = cardsOf(s);
+  if (s.t === 'cell') S.cells[s.i] = -1; else S.cols[s.i].length = s.idx;
+  if (t.t === 'found') S.found[cSuit(cs[0])]++; else if (t.t === 'cell') S.cells[t.i] = cs[0]; else S.cols[t.i].push(...cs);
+  S.moves++;
+  if (t.t === 'found') sfx.home(cRank(cs[0])); else sfx.place();
+  auto();
+  if (S.found.every(f => f === 13)) { S.over = true; sfx.win(); }
+}
+function tap(t, card) {
+  if (sel) {
+    if (card && card.t === sel.t && card.i === sel.i && card.idx === sel.idx) { sel = null; return; }
+    if (canMove(sel, t)) { apply(sel, t); sel = null; return; }
+    if (card && holds(card)) { sel = card; return; }
+    sfx.nope(); sel = null; return;
+  }
+  if (card) { if (holds(card)) sel = card; else sfx.nope(); }
+}
+const persist = () => saveKey(KEY, { S, first, hist });
+function render() {
+  if (App.current !== 'freecell' || !S) return;
+  const W = root.clientWidth - 32, g = Math.max(3, Math.round(W * 0.01));
+  const H = root.clientHeight - el('status').offsetHeight - root.querySelector('footer').offsetHeight;
+  const cw = Math.max(28, Math.floor(Math.min(100, (W - 7 * g) / 8, (H - 40) / 4.6 / 1.4))), ch = Math.round(cw * 1.4);
+  root.style.setProperty('--cw', cw + 'px'); root.style.setProperty('--ch', ch + 'px'); root.style.setProperty('--g', g + 'px');
+  let html = '<div class="fc-row">';
+  S.cells.forEach((c, i) => {
+    html += c >= 0 ? cardHTML(c, sel && sel.t === 'cell' && sel.i === i ? 'pick' : '', 'button', ' data-cell="' + i + '"')
+      : '<button type="button" class="pc ghost" data-cell="' + i + '" aria-label="' + t('empty_cell') + '"></button>';
+  });
+  S.found.forEach((f, x) => {
+    html += f ? cardHTML(x * 13 + f - 1, '', 'button', ' data-found="' + x + '"')
+      : '<button type="button" class="pc ghost" data-found="' + x + '" aria-label="' + t('foundation_of', { s: SUIT_WORDS[x] }) + '">' + SUITS[x] + '</button>';
+  });
+  html += '</div><div class="fc-row">';
+  const fanRoom = H - 40 - ch * 2.2, base = ch * 0.3;
+  S.cols.forEach((col, i) => {
+    const off = Math.max(ch * 0.15, col.length > 1 ? Math.min(base, fanRoom / (col.length - 1)) : base);
+    html += '<div class="fc-col" style="--off:' + off + 'px">' + (col.length
+      ? col.map((c, idx) => cardHTML(c, sel && sel.t === 'col' && sel.i === i && idx >= sel.idx ? 'pick' : '', 'button', ' data-col="' + i + '" data-idx="' + idx + '"')).join('')
+      : '<button type="button" class="pc ghost" data-col="' + i + '" aria-label="' + t('empty_col') + '"></button>') + '</div>';
+  });
+  el('fc').innerHTML = html + '</div>';
+  const n = capacity(false);
+  el('status').textContent = S.over ? '' : t('fc_status', { m: S.moves, c: plural('cards', n) });
+  root.querySelector('[data-act="undo"]').disabled = !hist.length || S.over;
+  root.querySelector('[data-act="restart"]').disabled = !hist.length;
+  setOverlay(el('over'), S.over ? 'over' : '', () => resultHTML(t('win_title'), t('solved', { n: S.moves }), null, null, t('again')));
+}
+root.addEventListener('click', e => {
+  if (!S) return;
+  const a = e.target.closest('[data-act]'), act = a && a.dataset.act;
+  if (act === 'new' || act === 'next') { deal(); sfx.shuffle(); }
+  else if (act === 'restart') { if (hist.length) { S = JSON.parse(first); hist = []; sel = null; } }
+  else if (act === 'undo') { if (hist.length && !S.over) { S = JSON.parse(hist.pop()); sel = null; sfx.undo(); } }
+  else if (!S.over) {
+    const b = e.target.closest('[data-col],[data-cell],[data-found]');
+    if (!b) { if (!sel || !e.target.closest('[data-el="fc"]')) return; sel = null; }
+    else if (b.dataset.found !== undefined) tap({ t: 'found' }, null);
+    else if (b.dataset.cell !== undefined) { const i = +b.dataset.cell; tap({ t: 'cell', i }, S.cells[i] >= 0 ? { t: 'cell', i } : null); }
+    else { const i = +b.dataset.col; tap({ t: 'col', i }, b.dataset.idx !== undefined ? { t: 'col', i, idx: +b.dataset.idx } : null); }
+  } else return;
+  render(); persist();
+});
+App.games.freecell = {
+  enter() {
+    if (!S) {
+      const d = loadKey(KEY);
+      if (d && valid(d.S)) { S = d.S; first = d.first || JSON.stringify(d.S); hist = Array.isArray(d.hist) ? d.hist : []; } else deal();
+    }
+    render();
+  }
+};
+if (window.ResizeObserver) new ResizeObserver(render).observe(root); else window.addEventListener('resize', render);
+})();
+</script>
+
+<script>
+/* ================= boot ================= */
+document.querySelectorAll('[data-fan]').forEach(f => { f.innerHTML = f.dataset.fan.split(',').map(id => cardHTML(+id, '', 'span')).join(''); });
+document.querySelectorAll('button[data-deck]').forEach(b => {
+  b.insertAdjacentHTML('afterbegin', '<span class="fan" aria-hidden="true">' + backHTML('', 'span') + cardHTML(24, '', 'span') + cardHTML(0, '', 'span') + '</span>');
+});
+window.addEventListener('hashchange', () => App.show(location.hash.slice(1) || 'menu'));
+/* store builds: the Android back button works like the Games button, and leaves the app from the menu */
+const capApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+if (capApp) capApp.addListener('backButton', () => { if (App.current === 'menu') capApp.exitApp(); else App.show('menu'); });
+App.show(location.hash.slice(1) || loadKey('cardtable-screen') || 'menu');
+</script>
+</body>
+</html>
