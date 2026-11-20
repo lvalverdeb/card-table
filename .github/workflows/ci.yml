@@ -1,0 +1,56 @@
+name: CI
+
+# Proves a clean checkout can pass the checklist and build the Google Play bundle.
+# The bundle built here is unsigned (no keystore in the repository); signing happens on the release machine.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checklist:
+    name: Playwright checklist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install test dependencies
+        run: npm ci
+        working-directory: test
+      - name: Run the checklist in Chrome
+        run: npm test
+        working-directory: test
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checklist-screenshots
+          path: test/screenshots
+
+  android:
+    name: Android bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install Capacitor and copy the page into the native projects
+        run: npm ci && npm run sync
+      - name: Build the release bundle (unsigned) and a debug APK
+        run: ./gradlew bundleRelease assembleDebug --no-daemon
+        working-directory: android
+      - name: Keep the outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-outputs
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/apk/debug/*.apk
