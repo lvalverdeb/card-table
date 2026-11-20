@@ -10,18 +10,25 @@ const serve = () => new Promise(res => {
   srv.listen(0, () => res({ srv, url: 'http://127.0.0.1:' + srv.address().port + '/' }));
 });
 const APPLE = process.argv.includes('--apple');
-/* App Store sizes. App Store Connect requires the "iPhone with Dynamic Island (medium display)" set, 1206x2622,
-   and the iPad 13-inch set, 2064x2752; the large-display set, 1320x2868, is optional and scaled from medium if absent. */
+/* App Store sizes, one set per App Store Connect slot, named as the console labels them. Required: "iPhone with Dynamic
+   Island (medium display)" and "iPad 13-inch display". Each slot accepts only its own pixel sizes, so a file dropped in the
+   wrong slot fails with "File dimensions are invalid"; the file name prefix says which slot it belongs to. */
 const SIZES = APPLE
-  ? { 'iphone-medium': { w: 402, h: 874, scale: 3 }, 'iphone-large': { w: 440, h: 956, scale: 3 }, 'ipad-13': { w: 1032, h: 1376, scale: 2 } }
+  ? { 'iphone-dynamic-island-medium': { w: 402, h: 874, scale: 3 },    /* 1206x2622, required */
+      'iphone-dynamic-island-large': { w: 440, h: 956, scale: 3 },     /* 1320x2868 */
+      'iphone-face-id-large': { w: 428, h: 926, scale: 3 },            /* 1284x2778 */
+      'iphone-duo-inner': { w: 669, h: 951, scale: 3 },                /* 2007x2853 */
+      'iphone-duo-outer': { w: 699, h: 1017, scale: 2 },               /* 1398x2034 */
+      'ipad-13': { w: 1032, h: 1376, scale: 2 } }                      /* 2064x2752, required */
   : { phone: { w: 360, h: 640, scale: 3 }, tablet7: { w: 600, h: 960, scale: 2 }, tablet10: { w: 800, h: 1280, scale: 2 } };
+const FULL = ['phone', 'iphone-dynamic-island-medium', 'iphone-dynamic-island-large'];   /* all seven shots; other slots get three */
 const GAMES = ['menu', 'klondike', 'freecell', 'rummy', 'hearts', 'eights', 'sevens'];
 (async () => {
   const { srv, url } = await serve();
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   for (const lang of ['en', 'es', 'fr']) {
     for (const [name, sz] of Object.entries(SIZES)) {
-      const games = name === 'phone' || name.startsWith('iphone') ? GAMES : ['menu', 'klondike', 'hearts'];
+      const games = FULL.includes(name) ? GAMES : ['menu', 'klondike', 'hearts'];
       const ctx = await browser.newContext({ viewport: { width: sz.w, height: sz.h }, deviceScaleFactor: sz.scale, locale: lang });
       const p = await ctx.newPage();
       await p.goto(url + '#menu'); await sleep(300);

@@ -8,8 +8,12 @@ Apple's process has fewer forms than Google's but needs a paid membership and a 
 |---|---|
 | iOS project, bundle id `com.lvalverdeb.cardtable`, version 1.0 build 1, iOS 14 and later, iPhone and iPad | `ios/App/App.xcodeproj` |
 | App icon (1024 × 1024, in the asset catalog) and splash | `ios/App/App/Assets.xcassets` |
-| iPhone screenshots for the required "iPhone with Dynamic Island (medium display)" slot, 1206 × 2622, seven per language | `store/apple/screenshots/{en,es,fr}/iphone-medium-*.png` |
-| iPhone screenshots for the optional large-display slot, 1320 × 2868 | `store/apple/screenshots/{en,es,fr}/iphone-large-*.png` |
+| Screenshots, one named set per App Store Connect slot, in `store/apple/screenshots/{en,es,fr}/`: | |
+| · iPhone with Dynamic Island (medium display), 1206 × 2622, **required**, seven shots | `iphone-dynamic-island-medium-*.png` |
+| · iPhone with Dynamic Island (large display), 1320 × 2868, seven shots | `iphone-dynamic-island-large-*.png` |
+| · iPhone with Face ID (large display), 1284 × 2778, three shots | `iphone-face-id-large-*.png` |
+| · iPhone Duo inner display, 2007 × 2853, and outer display, 1398 × 2034, three shots each (optional until April 2027) | `iphone-duo-inner-*.png`, `iphone-duo-outer-*.png` |
+| · iPad 13" display, 2064 × 2752, **required**, three shots | `ipad-13-*.png` |
 | iPad 13-inch screenshots, 2064 × 2752, three per language | `store/apple/screenshots/{en,es,fr}/ipad-13-*.png` |
 | Listing text in English, Spanish and French (same copy as Google Play; Apple's limits are 30 characters for the name, 30 for the subtitle, 170 for the promotional text, 4000 for the description) | `store/listing-en.md`, `listing-es.md`, `listing-fr.md` |
 | Privacy policy URL | https://lvalverdeb.github.io/card-table/store/privacy-policy.html |
@@ -49,7 +53,7 @@ The same can be done in Xcode: Product > Archive, then **Distribute App** > **Ap
 
 Open the app in App Store Connect and work down the **1.0 Prepare for Submission** page:
 
-- **Screenshots**: App Store Connect labels the slots by device family, not inches. Drag the `iphone-medium-*` files into **iPhone with Dynamic Island (medium display)**, which is the required slot, the `iphone-large-*` files into the large-display slot if you want them, and the `ipad-13-*` files into **iPad 13-inch display**. Each slot only accepts its own pixel sizes; a file dropped into the wrong slot fails with "File dimensions are invalid". Apple scales these for every other device.
+- **Screenshots**: App Store Connect labels the slots by device family, and the first one shown is **iPhone Duo**, which is optional. Each slot accepts only its own pixel sizes, and a file dropped into the wrong one fails with "File dimensions are invalid". Read the slot's label, then drag the files whose name prefix matches it: `iphone-dynamic-island-medium-*` into **iPhone with Dynamic Island (medium display)**, the required slot; `ipad-13-*` into **iPad 13-inch display**, also required; the other prefixes into their slots if you want them. Apple scales the required sets for every other device.
 - **Promotional text** (optional, 170 characters): "Six classic card games, fully offline, with no ads and no accounts."
 - **Description**: the full description from `listing-en.md`. **Keywords** (100 characters): `solitaire,klondike,freecell,rummy,hearts,crazy eights,sevens,card games,offline`.
 - **Support URL**: the GitHub repository. **Marketing URL** (optional): https://lvalverdeb.github.io/card-table/
