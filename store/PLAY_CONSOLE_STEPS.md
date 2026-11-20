@@ -63,7 +63,7 @@ After 14 continuous days with at least 12 opted-in testers, the dashboard offers
 
 1. **Production > Create new release**, upload the same bundle (or a newer one with a higher versionCode), add release notes, review and roll out.
 2. **Countries**: choose all, or the ones you want.
-3. First review takes from a few hours to a week. The app then appears at `https://play.google.com/store/apps/details?id=com.lvalverdeb.cardtable`.
+3. First review takes from a few hours to a week. The app then appears at `https://play.google.com/store/apps/details?id=com.lvalverdeb.card_table`.
 
 ## Updating later
 

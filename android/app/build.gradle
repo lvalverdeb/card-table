@@ -9,7 +9,7 @@ android {
     namespace = "com.lvalverdeb.cardtable"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.lvalverdeb.cardtable"
+        applicationId "com.lvalverdeb.card_table"   // the Play Console identity; the Java package (namespace) stays cardtable
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

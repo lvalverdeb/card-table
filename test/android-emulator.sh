@@ -17,7 +17,7 @@ $ADB wait-for-device
 for i in {1..120}; do [ "$($ADB shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break; sleep 2; done
 echo "booted after ~$((i*2))s"
 $ADB install -r "$APK" | tail -1
-$ADB shell am start -n com.lvalverdeb.cardtable/.MainActivity > /dev/null
+$ADB shell am start -n com.lvalverdeb.card_table/com.lvalverdeb.cardtable.MainActivity > /dev/null
 sleep 7
 $ADB exec-out screencap -p > "$OUT" && echo "screenshot: $OUT"
 echo "the emulator stays up for manual checks; stop it with: $ADB emu kill"
