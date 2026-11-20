@@ -4,6 +4,8 @@
   "description": "Card Table: six card games in one page",
   "scripts": {
     "build": "rm -rf dist && mkdir dist && cp index.html dist/ && cp -R fonts dist/",
+    "mac:gen": "npm run build && cd mac && xcodegen generate",
+    "mac:open": "npm run mac:gen && open mac/CardTable.xcodeproj",
     "sync": "npm run build && cap sync",
     "android:bundle": "npm run sync && cd android && ./gradlew bundleRelease",
     "ios:open": "npm run sync && cap open ios",

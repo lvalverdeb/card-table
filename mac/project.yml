@@ -1,0 +1,46 @@
+# XcodeGen spec for the native Mac app. Generate the project with `npm run mac:gen` from the repository
+# root (it runs `npm run build` first, then `xcodegen` here). The app is a window with a web view that
+# loads the same page the phones use, served from the bundled copy of dist/ through a custom URL scheme.
+name: CardTable
+options:
+  bundleIdPrefix: com.lvalverdeb
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: 4PSYWG2GAA
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: 2    # Mac build numbers are independent of iOS; 1 was uploaded with a blank web view
+    SWIFT_VERSION: "5.9"
+targets:
+  CardTable:
+    type: application
+    platform: macOS
+    sources:
+      - path: CardTable
+      - path: ../dist          # the web page and fonts, written by `npm run build`; bundled as a folder named dist
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: "Card Table"
+        PRODUCT_BUNDLE_IDENTIFIER: com.lvalverdeb.cardtable   # same as iOS: one App Store record, universal purchase
+        CODE_SIGN_ENTITLEMENTS: CardTable/CardTable.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: CardTable/Info.plist
+      properties:
+        CFBundleName: "Card Table: Six Games"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"      # XcodeGen would otherwise write a literal 1
+        CFBundleDisplayName: "Card Table"
+        CFBundleLocalizations: [en, es, fr]
+        LSApplicationCategoryType: public.app-category.card-games
+        NSHumanReadableCopyright: "© Luis Valverde Badilla"
+        NSPrincipalClass: NSApplication
+        ITSAppUsesNonExemptEncryption: false
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"

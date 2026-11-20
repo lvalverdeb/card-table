@@ -54,3 +54,18 @@ jobs:
           path: |
             android/app/build/outputs/bundle/release/*.aab
             android/app/build/outputs/apk/debug/*.apk
+
+  mac:
+    name: Mac app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Mac project (copies the page into dist/ first)
+        run: npm ci && npm run mac:gen
+      - name: Build the Mac app (unsigned)
+        run: xcodebuild -project mac/CardTable.xcodeproj -scheme CardTable -configuration Release -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO build

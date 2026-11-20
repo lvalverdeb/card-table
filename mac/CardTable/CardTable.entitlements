@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The Mac App Store requires the App Sandbox. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- WebKit refuses to launch its web content process in a sandboxed app without this ("Application does
+	     not have permission to communicate with network resources"), even though the page is bundled and
+	     the app never goes online. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

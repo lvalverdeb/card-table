@@ -2,7 +2,7 @@
 
 Six classic card games on one quiet green table: Klondike, FreeCell, Rummy, Hearts, Crazy Eights and Sevens. Everything lives in a single `index.html` with no build step and no dependencies, runs fully offline, and is available in English, Spanish and French.
 
-**Play it:** https://lvalverdeb.github.io/card-table/ in any modern browser, or open `index.html` locally, or install the packaged app for Android and iOS (see below).
+**Play it:** https://lvalverdeb.github.io/card-table/ in any modern browser, or open `index.html` locally, or install the packaged app for Android, iOS and macOS (see below).
 
 ## Games
 
@@ -25,6 +25,7 @@ Five card designs including a large-print deck, gentle sound effects, a How to p
 | `fonts/` | Instrument Sans and Young Serif (SIL Open Font License) |
 | `test/` | Playwright checklist (`cd test && npm install && npm test`), emulator and simulator scripts, store screenshot renderer |
 | `android/`, `ios/` | Capacitor projects for Google Play and the App Store (`npm install`, then `npm run sync`) |
+| `mac/` | Native Mac app for the Mac App Store: a SwiftUI window with a web view serving the bundled page (`npm run mac:open`) |
 | `assets/` | Source icon and splash images |
 | `store/` | Google Play listing kit: graphics, screenshots, listing text, privacy policy, console walkthrough |
 | `BUILD_GUIDE.md` | How the code is organised, how to test it and how to package it |

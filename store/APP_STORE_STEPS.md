@@ -14,7 +14,7 @@ Apple's process has fewer forms than Google's but needs a paid membership and a 
 | · iPhone with Face ID (large display), 1284 × 2778, three shots | `iphone-face-id-large-*.png` |
 | · iPhone Duo inner display, 2007 × 2853, and outer display, 1398 × 2034, three shots each (optional until April 2027) | `iphone-duo-inner-*.png`, `iphone-duo-outer-*.png` |
 | · iPad 13" display, 2064 × 2752, **required**, three shots | `ipad-13-*.png` |
-| Mac App Store screenshots, 2880 × 1800 landscape, seven per language, from `node store-screenshots.js --mac`; only needed if a macOS version is ever submitted (the iOS build is not a Mac app; tick "Make this app available on Mac" under Pricing and Availability instead) | `store/apple/mac/screenshots/{en,es,fr}/mac-*.png` |
+| Mac App Store screenshots, 2880 × 1800 landscape, seven per language, from `node store-screenshots.js --mac`, for the macOS version served by the native Mac app in `mac/` | `store/apple/mac/screenshots/{en,es,fr}/mac-*.png` |
 | iPad 13-inch screenshots, 2064 × 2752, three per language | `store/apple/screenshots/{en,es,fr}/ipad-13-*.png` |
 | Listing text in English, Spanish and French (same copy as Google Play; Apple's limits are 30 characters for the name, 30 for the subtitle, 170 for the promotional text, 4000 for the description) | `store/listing-en.md`, `listing-es.md`, `listing-fr.md` |
 | Privacy policy URL | https://lvalverdeb.github.io/card-table/store/privacy-policy.html |
@@ -49,6 +49,18 @@ xcodebuild -exportArchive -archivePath build/CardTable.xcarchive -exportOptionsP
 The export both signs with your distribution certificate (Xcode creates it on first use) and uploads to App Store Connect. The build appears under the app's **TestFlight** tab ten to thirty minutes later, after Apple's processing.
 
 The same can be done in Xcode: Product > Archive, then **Distribute App** > **App Store Connect** > Upload.
+
+## 3b. The macOS version
+
+The app record also has a macOS version, served by the native Mac app in `mac/` (same bundle identifier, so it is the same App Store record and a universal purchase). Build and upload it with:
+
+```
+npm run mac:gen
+xcodebuild -project mac/CardTable.xcodeproj -scheme CardTable -configuration Release -destination 'generic/platform=macOS' -archivePath mac/build/CardTable.xcarchive -allowProvisioningUpdates archive
+xcodebuild -exportArchive -archivePath mac/build/CardTable.xcarchive -exportOptionsPlist mac/export-appstore.plist -exportPath mac/build/export -allowProvisioningUpdates
+```
+
+Before uploading, `mac/smoke.sh` should print a `smoke: loaded:` line with the page title. Each upload needs a higher `CURRENT_PROJECT_VERSION` in `mac/project.yml` (Mac build numbers are separate from iOS). On the macOS version page use the screenshots in `store/apple/mac/screenshots/{en,es,fr}` (2880 × 1800), the same descriptions and keywords, and the same App Privacy answers. The build appears under the macOS version's Build section after processing.
 
 ## 4. Fill in the App Store listing
 
