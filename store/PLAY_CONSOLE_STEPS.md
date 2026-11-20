@@ -17,16 +17,13 @@ Everything the Play Console asks for is in this folder. The steps below follow t
 
 Regenerate the screenshots and feature graphic after any visual change with `cd test && node store-screenshots.js`.
 
-## 1. Host the privacy policy
+## 1. The privacy policy URL
 
-Google requires a public URL. The simplest free option is GitHub Pages:
+The repository's GitHub Pages site serves the policy publicly at:
 
-1. Create a public repository, for example `cardtable-privacy`.
-2. Upload `store/privacy-policy.html` renamed to `index.html`.
-3. In the repository's Settings > Pages, choose the main branch as the source.
-4. The policy is then at `https://<your-github-user>.github.io/cardtable-privacy/`. Open it once to confirm.
+    https://lvalverdeb.github.io/card-table/store/privacy-policy.html
 
-Any other static host works too. The URL must stay live for as long as the app is listed.
+Paste that into the console. It stays live as long as the repository is public and Pages is on. The same site serves the playable web version at https://lvalverdeb.github.io/card-table/, which can go in the listing's Website field.
 
 ## 2. Create the developer account
 

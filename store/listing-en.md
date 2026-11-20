@@ -42,4 +42,4 @@ solitaire, klondike, freecell, rummy, hearts, crazy eights, offline, card games
 (your public developer email; shown on the listing)
 
 ## Privacy policy URL
-(public URL of store/privacy-policy.html; see PLAY_CONSOLE_STEPS.md)
+https://lvalverdeb.github.io/card-table/store/privacy-policy.html

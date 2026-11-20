@@ -2,7 +2,7 @@
 
 Six classic card games on one quiet green table: Klondike, FreeCell, Rummy, Hearts, Crazy Eights and Sevens. Everything lives in a single `index.html` with no build step and no dependencies, runs fully offline, and is available in English, Spanish and French.
 
-**Play it:** open `index.html` in any modern browser, or install the packaged app for Android and iOS (see below).
+**Play it:** https://lvalverdeb.github.io/card-table/ in any modern browser, or open `index.html` locally, or install the packaged app for Android and iOS (see below).
 
 ## Games
 
