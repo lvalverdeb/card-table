@@ -39,7 +39,7 @@ Games > Card
 solitaire, klondike, freecell, rummy, hearts, crazy eights, offline, card games
 
 ## Contact email
-(your public developer email; shown on the listing)
+lvalverdeb@gmail.com
 
 ## Privacy policy URL
 https://lvalverdeb.github.io/card-table/store/privacy-policy.html
