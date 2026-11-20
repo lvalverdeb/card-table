@@ -14,6 +14,7 @@ Apple's process has fewer forms than Google's but needs a paid membership and a 
 | Listing text in English, Spanish and French (same copy as Google Play; Apple's limits are 30 characters for the name, 30 for the subtitle, 170 for the promotional text, 4000 for the description) | `store/listing-en.md`, `listing-es.md`, `listing-fr.md` |
 | Privacy policy URL | https://lvalverdeb.github.io/card-table/store/privacy-policy.html |
 | Support URL | https://github.com/lvalverdeb/card-table |
+| Header and search results asset (optional, iOS 27 product pages): universal 16:9 PNG, 5244 × 2950, with the artwork inside the area both crops keep; regenerate with `cd test && node store-header.js` | `store/apple/graphics/universal-header-5244x2950.png` |
 | Export compliance | `ITSAppUsesNonExemptEncryption` is `false` in `Info.plist`, so App Store Connect does not ask about encryption for each build |
 
 Regenerate the screenshots after any visual change with `cd test && node store-screenshots.js --apple`.
@@ -55,6 +56,7 @@ Open the app in App Store Connect and work down the **1.0 Prepare for Submission
 - **Build**: select the uploaded build.
 - **App Review information**: your name, phone and email; no sign-in required; notes can say "Fully offline card games; nothing to configure."
 - **Version release**: automatically release after approval, or manual.
+- **Header and Search Results** tab (optional): upload `store/apple/graphics/universal-header-5244x2950.png` as the product page header and tick the option to use it in search results too. Use the preview to confirm the title and cards stay inside the safe area in both placements. Without it, the App Store shows the screenshots as before.
 - **Localisations**: use the language menu at the top right of the page to add Spanish (Mexico) and French, paste from `listing-es.md` and `listing-fr.md`, and drag the matching screenshot folders.
 
 Then the app-level sections in the left column:
